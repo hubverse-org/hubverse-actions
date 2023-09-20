@@ -6,7 +6,7 @@
 
 This repository stores [GitHub Actions](https://github.com/features/actions) for hubverse hubs, which can be used to do a variety of CI tasks. 
 
-Each directory in this repository contains a GitHub Action that can be downloaded using `hubValidations::use_hub_github_action()` and the name of the directory as the action name. Consult individual READMEs for details on each action.
+Each directory in this repository contains a GitHub Action that can be downloaded using `hubCI::use_hub_github_action()` and the name of the directory as the action name. Consult individual READMEs for details on each action.
 
 
 ## Additional resources
