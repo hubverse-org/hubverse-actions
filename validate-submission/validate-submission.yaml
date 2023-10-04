@@ -38,6 +38,7 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.number }}
         run: |
+          library("hubValidations")
           v <- hubValidations::validate_pr(
               gh_repo = Sys.getenv("GITHUB_REPOSITORY"),
               pr_number = Sys.getenv("PR_NUMBER")
