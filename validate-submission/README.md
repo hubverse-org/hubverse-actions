@@ -1,7 +1,7 @@
 # validate-submission
 
 
-This hubverse action installs the `hubValidations` package from GitHub using remotes as well as required system dependencies.
+This hubverse action installs the `hubValidations` package from GitHub using pak as well as required system dependencies.
 
 It then performs submission validation checks through function `hubValidations::validate_pr()`
 
