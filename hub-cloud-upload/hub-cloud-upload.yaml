@@ -1,0 +1,51 @@
+name: Upload hub data to cloud storage
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  # Hubverse AWS account number
+  AWS_ACCOUNT: 767397675902
+
+permissions:
+  contents: read
+  # id-token write required for AWS auth
+  id-token: write
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Get hub cloud config
+      # save cloud-related fields from admin config as environment variables
+      # (jq json parser is installed on Github-hosted runners)
+      run: |
+        cloud_enabled=$(cat ./hub-config/admin.json | jq -r '.cloud.enabled') && echo "CLOUD_ENABLED=$cloud_enabled"
+        cloud_host=$(cat ./hub-config/admin.json | jq -r '.cloud.host.name') && echo "CLOUD_HOST=$cloud_host"
+        cloud_storage=$(cat ./hub-config/admin.json | jq -r '.cloud.host.storage') && echo "CLOUD_STORAGE=$cloud_storage"
+        echo "CLOUD_ENABLED=$cloud_enabled" >> $GITHUB_ENV
+        echo "CLOUD_HOST=$cloud_host" >> $GITHUB_ENV
+        echo "CLOUD_STORAGE=$cloud_storage" >> $GITHUB_ENV
+
+    - name: Configure AWS credentials
+      # request credentials to assume the hub's AWS role via OpenID Connect
+      if: env.CLOUD_ENABLED == 'true'
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT }}:role/${{ env.CLOUD_STORAGE }}
+        aws-region: us-east-1
+
+    - name: Sync files to cloud storage
+      if: env.CLOUD_ENABLED == 'true'
+      run: |
+        aws s3 sync ./hub-config "s3://$CLOUD_STORAGE/hub-config" --delete
+        aws s3 sync ./model-metadata "s3://$CLOUD_STORAGE/model-metadata" --delete
+        aws s3 sync ./model-output "s3://$CLOUD_STORAGE/raw/model-output" --delete
+      env:
+        CLOUD_STORAGE: ${{ env.CLOUD_STORAGE }}
