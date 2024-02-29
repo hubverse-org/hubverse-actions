@@ -26,26 +26,33 @@ jobs:
       # save cloud-related fields from admin config as environment variables
       # (jq json parser is installed on Github-hosted runners)
       run: |
-        cloud_enabled=$(cat ./hub-config/admin.json | jq -r '.cloud.enabled') && echo "CLOUD_ENABLED=$cloud_enabled"
-        cloud_host=$(cat ./hub-config/admin.json | jq -r '.cloud.host.name') && echo "CLOUD_HOST=$cloud_host"
-        cloud_storage=$(cat ./hub-config/admin.json | jq -r '.cloud.host.storage') && echo "CLOUD_STORAGE=$cloud_storage"
+        cloud_enabled=$(cat ./hub-config/admin.json | jq -r '.cloud.enabled') \
+          && echo "CLOUD_ENABLED=$cloud_enabled"
+        cloud_host=$(cat ./hub-config/admin.json | jq -r '.cloud.host.name') \
+          && echo "CLOUD_HOST=$cloud_host"
+        cloud_storage_service=$(cat ./hub-config/admin.json | jq -r '.cloud.host.storage_service') \
+          && echo "CLOUD_STORAGE_SERVICE=$cloud_storage_service"
+        cloud_storage_location=$(cat ./hub-config/admin.json | jq -r '.cloud.host.storage_location') \
+          && echo "CLOUD_STORAGE_LOCATION=$cloud_storage_location"
         echo "CLOUD_ENABLED=$cloud_enabled" >> $GITHUB_ENV
         echo "CLOUD_HOST=$cloud_host" >> $GITHUB_ENV
-        echo "CLOUD_STORAGE=$cloud_storage" >> $GITHUB_ENV
+        echo "CLOUD_STORAGE_SERVICE=$cloud_storage_service" >> $GITHUB_ENV
+        echo "CLOUD_STORAGE_LOCATION=$cloud_storage_location" >> $GITHUB_ENV
 
     - name: Configure AWS credentials
       # request credentials to assume the hub's AWS role via OpenID Connect
       if: env.CLOUD_ENABLED == 'true'
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT }}:role/${{ env.CLOUD_STORAGE }}
+        role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT }}:role/${{ env.CLOUD_STORAGE_LOCATION }}
         aws-region: us-east-1
 
     - name: Sync files to cloud storage
       if: env.CLOUD_ENABLED == 'true'
       run: |
-        aws s3 sync ./hub-config "s3://$CLOUD_STORAGE/hub-config" --delete
-        aws s3 sync ./model-metadata "s3://$CLOUD_STORAGE/model-metadata" --delete
-        aws s3 sync ./model-output "s3://$CLOUD_STORAGE/raw/model-output" --delete
+        aws s3 sync ./hub-config "s3://$BUCKET_NAME/hub-config" --delete
+        aws s3 sync ./model-metadata "s3://$BUCKET_NAME/model-metadata" --delete
+        aws s3 sync ./model-output "s3://$BUCKET_NAME/raw/model-output" --delete
       env:
-        CLOUD_STORAGE: ${{ env.CLOUD_STORAGE }}
+        BUCKET_NAME: ${{ env.CLOUD_STORAGE_LOCATION }}
+
