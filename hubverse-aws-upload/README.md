@@ -1,14 +1,14 @@
-# hub-cloud-upload
+# hubverse-aws-upload
 
 
-This hubverse action uploads hub data to the cloud. Currently, the workflow has a single job, `upload`,
+This action uploads hub data to Hubverse-hosted cloud storage. Currently, the workflow has a single job, `upload`,
 that pushes data to an AWS S3 bucket.
 
 The `upload` job perform the following steps:
 
 1. Inspect the hub's admin config (`admin.json`) for a `cloud` group.
 2. If `cloud.enabled` is set to `true`:
-    - authenticate to AWS
+    - authenticate to the Hubverse AWS account
     - use `cloud.host.storage` to determine the name of the hub's S3 bucket
     - sync the hub's `hub-config`, `model-metadata`, and `model-output` directories to the S3 bucket
 
@@ -19,7 +19,7 @@ the action will skip AWS-related steps.
 
 ## AWS setup
 
-Before using this action, a member of the hubverse development team will need to "onboard" the hub to AWS. Onboarding is
+Before using this action, a member of the Hubverse development team will need to "onboard" the hub to AWS. Onboarding is
 a one-time process that creates:
 
 - An AWS S3 bucket for the hub
