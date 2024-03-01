@@ -48,11 +48,24 @@ jobs:
         aws-region: us-east-1
 
     - name: Sync files to cloud storage
+      # sync specified hub directories to S3
+      # (to exclude a directory, remove it from the hub_directories list below)
       if: env.CLOUD_ENABLED == 'true'
       run: |
-        aws s3 sync ./hub-config "s3://$BUCKET_NAME/hub-config" --delete
-        aws s3 sync ./model-metadata "s3://$BUCKET_NAME/model-metadata" --delete
-        aws s3 sync ./model-output "s3://$BUCKET_NAME/raw/model-output" --delete
+        hub_directories=(
+          'auxiliary-data'
+          'hub-config'
+          'model-abstracts'
+          'model-metadata'
+          'model-output'
+          'target-data'
+        )
+        for DIRECTORY in "${hub_directories[@]}"
+        do
+          if [ -d "./$DIRECTORY" ]; then aws s3 sync "./$DIRECTORY" "s3://$BUCKET_NAME/$DIRECTORY" --delete; fi
+        done
+      shell: bash
       env:
         BUCKET_NAME: ${{ env.CLOUD_STORAGE_LOCATION }}
+
 
