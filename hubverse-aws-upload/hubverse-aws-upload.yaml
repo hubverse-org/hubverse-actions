@@ -57,8 +57,6 @@ jobs:
           'hub-config'
           'model-abstracts'
           'model-metadata'
-          # temporarily include model-output here
-          'model-output'
           'target-data'
         )
         for DIRECTORY in "${hub_directories[@]}"
