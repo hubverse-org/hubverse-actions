@@ -20,7 +20,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Get hub cloud config
       # save cloud-related fields from admin config as environment variables
@@ -28,15 +28,9 @@ jobs:
       run: |
         cloud_enabled=$(cat ./hub-config/admin.json | jq -r '.cloud.enabled') \
           && echo "CLOUD_ENABLED=$cloud_enabled"
-        cloud_host=$(cat ./hub-config/admin.json | jq -r '.cloud.host.name') \
-          && echo "CLOUD_HOST=$cloud_host"
-        cloud_storage_service=$(cat ./hub-config/admin.json | jq -r '.cloud.host.storage_service') \
-          && echo "CLOUD_STORAGE_SERVICE=$cloud_storage_service"
         cloud_storage_location=$(cat ./hub-config/admin.json | jq -r '.cloud.host.storage_location') \
           && echo "CLOUD_STORAGE_LOCATION=$cloud_storage_location"
         echo "CLOUD_ENABLED=$cloud_enabled" >> $GITHUB_ENV
-        echo "CLOUD_HOST=$cloud_host" >> $GITHUB_ENV
-        echo "CLOUD_STORAGE_SERVICE=$cloud_storage_service" >> $GITHUB_ENV
         echo "CLOUD_STORAGE_LOCATION=$cloud_storage_location" >> $GITHUB_ENV
 
     - name: Configure AWS credentials
@@ -46,6 +40,12 @@ jobs:
       with:
         role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT }}:role/${{ env.CLOUD_STORAGE_LOCATION }}
         aws-region: us-east-1
+
+    - name: Install rclone
+      if: env.CLOUD_ENABLED == 'true'
+      run: |
+        curl https://rclone.org/install.sh | sudo bash
+        rclone version
 
     - name: Sync files to cloud storage
       # sync specified hub directories to S3
@@ -57,15 +57,22 @@ jobs:
           'hub-config'
           'model-abstracts'
           'model-metadata'
-          'model-output'
           'target-data'
         )
         for DIRECTORY in "${hub_directories[@]}"
         do
-          if [ -d "./$DIRECTORY" ]; then aws s3 sync "./$DIRECTORY" "s3://$BUCKET_NAME/$DIRECTORY" --delete; fi
+          if [ -d "./$DIRECTORY" ]
+          then
+            rclone sync \
+              "./$DIRECTORY/" \
+              ":s3,provider=AWS,env_auth:$BUCKET_NAME/$DIRECTORY" \
+              --checksum --verbose --stats-one-line --config=/dev/null
+          fi
         done
+        # unlike other data, model-outputs are synced to a "raw" location
+        # so we can transform it before presenting to users
+        rclone sync ./model-output/ ":s3,provider=AWS,env_auth:$BUCKET_NAME/raw/model-output" \
+          --checksum --verbose --stats-one-line --config=/dev/null
       shell: bash
       env:
         BUCKET_NAME: ${{ env.CLOUD_STORAGE_LOCATION }}
-
-
