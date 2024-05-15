@@ -9,8 +9,8 @@ The `upload` job perform the following steps:
 1. Inspect the hub's admin config (`admin.json`) for a `cloud` group.
 2. If `cloud.enabled` is set to `true`:
     - authenticate to the Hubverse AWS account
-    - use `cloud.host.storage` to determine the name of the hub's S3 bucket
-    - sync the hub's `hub-config`, `model-metadata`, and `model-output` directories to the S3 bucket
+    - use `cloud.host.storage_location` to determine the name of the hub's S3 bucket
+    - sync the following hub directories to the S3 bucket: `auxiliary-data`, `hub-config`, `model-abstracts`, `model-metadata`, `model-output`, `target-data`
 
 **Note**: This action is safe to use with non cloud-enabled hubs. 
 If the hub's `admin.config` does not contain a `cloud` group or has `cloud.enabled` set to anything other than `true`,
