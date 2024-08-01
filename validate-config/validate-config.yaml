@@ -1,0 +1,65 @@
+name: Hub Config Validation (R)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: main
+    paths:
+      - 'hub-config/**'
+      - '!**README**'
+
+jobs:
+  validate-submission:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          install-r: false
+          use-public-rspm: true
+
+      - name: Update R
+        run: |
+          sudo apt-get update
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: any::gt, hubverse-org/hubValidations, any::sessioninfo
+
+      - name: Run validations
+        id: validate
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          library("hubValidations")
+          v <- hubAdmin::validate_hub_config(
+            hub_path = "${{ github.workspace }}"
+          )
+          # check if there were any failures
+          invalid <- any(vapply(v, isFALSE, logical(1)))
+          if (invalid) {
+            cat("result=false", "\n", file = Sys.getenv("GITHUB_OUTPUT"), sep = "", append = TRUE)
+            # write output to HTML
+            tbl <- hubAdmin::view_config_val_errors(v)
+            writeLines("## :x: Invalid Configuration\n", "${{ github.workspace }}/diff.md")
+            cat("\nThe schema in `hub-config/` appear to be invalid. Details about the exact locations of the errors can be found in the table below.\n", file = "${{ github.workspace }}/diff.md", append = TRUE)
+            cat(gt::as_raw_html(tbl), "\n", file = "${{ github.workspace }}/diff.md", sep = "", append = TRUE)
+          } else {
+            cat("result=true", "\n", file = Sys.getenv("GITHUB_OUTPUT"), sep = "", append = TRUE)
+          }
+        shell: Rscript {0}
+      - name: "Comment on PR"
+        id: comment-diff
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.validate.outputs.result == 'false' }}
+        uses: carpentries/actions/comment-diff@main
+        with:
+          pr: ${{ github.event.number }}
+          path: ${{ github.workspace }}/diff.md
+      - name: Error on Failure
+        if: ${{ steps.validate.outputs.result == 'false' }}
+        run: exit 1
+
