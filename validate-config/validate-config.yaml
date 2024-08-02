@@ -42,6 +42,10 @@ jobs:
           diff <- Sys.getenv("DIFF_PATH")
           hub_path <- dirname(diff)
           output <- Sys.getenv("GITHUB_OUTPUT")
+          timestamp <- function(outfile) {
+            stamp <- format(Sys.time(), usetz = TRUE, tz = "UTC")
+            cat(stamp, "\n", file = outfile, sep = "", append = TRUE)
+          }
           v <- hubAdmin::validate_hub_config(
             hub_path = hub_path
           )
@@ -54,18 +58,23 @@ jobs:
             writeLines("## :x: Invalid Configuration\n", diff)
             cat("\nErrors were detected in one or more config files in `hub-config/`. Details about the exact locations of the errors can be found in the table below.\n", file = diff, append = TRUE)
             cat(gt::as_raw_html(tbl), "\n", file = diff, sep = "", append = TRUE)
+            timestamp(diff)
           } else {
             cat("result=true", "\n", file = output, sep = "", append = TRUE)
+            writeLines(":white_check_mark: Hub correctly configured!\n", diff)
+            timestamp(diff)
           }
         shell: Rscript {0}
       - name: "Comment on PR"
         id: comment-diff
-        if: ${{ github.event_name != 'workflow_dispatch' && steps.validate.outputs.result == 'false' }}
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         uses: carpentries/actions/comment-diff@main
         with:
           pr: ${{ env.PR_NUMBER }}
           path: ${{ env.DIFF_PATH }}
       - name: Error on Failure
         if: ${{ steps.validate.outputs.result == 'false' }}
-        run: exit 1
+        run: |
+          echo "::error title=Invalid Configuration::Errors were detected in one or more config files in 'hub-config/'"
+          exit 1
 
