@@ -35,20 +35,23 @@ jobs:
         env:
           PR_NUMBER: ${{ github.event.number }}
         run: |
+          workspace <- "${{ github.workspace }}"
+          output <- Sys.getenv("GITHUB_OUTPUT")
+          diff <- file.path(workspace, "diff.md")
           v <- hubAdmin::validate_hub_config(
-            hub_path = "${{ github.workspace }}"
+            hub_path = workspace
           )
           # check if there were any failures
           invalid <- any(vapply(v, isFALSE, logical(1)))
           if (invalid) {
-            cat("result=false", "\n", file = Sys.getenv("GITHUB_OUTPUT"), sep = "", append = TRUE)
+            cat("result=false", "\n", file = output, sep = "", append = TRUE)
             # write output to HTML
             tbl <- hubAdmin::view_config_val_errors(v)
-            writeLines("## :x: Invalid Configuration\n", "${{ github.workspace }}/diff.md")
-            cat("\nErrors were detected in one or more config files in `hub-config/`. Details about the exact locations of the errors can be found in the table below.\n", file = "${{ github.workspace }}/diff.md", append = TRUE)
-            cat(gt::as_raw_html(tbl), "\n", file = "${{ github.workspace }}/diff.md", sep = "", append = TRUE)
+            writeLines("## :x: Invalid Configuration\n", diff)
+            cat("\nErrors were detected in one or more config files in `hub-config/`. Details about the exact locations of the errors can be found in the table below.\n", file = diff, append = TRUE)
+            cat(gt::as_raw_html(tbl), "\n", file = diff, sep = "", append = TRUE)
           } else {
-            cat("result=true", "\n", file = Sys.getenv("GITHUB_OUTPUT"), sep = "", append = TRUE)
+            cat("result=true", "\n", file = output, sep = "", append = TRUE)
           }
         shell: Rscript {0}
       - name: "Comment on PR"
