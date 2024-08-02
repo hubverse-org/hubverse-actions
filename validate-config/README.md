@@ -1,6 +1,6 @@
 # validate-config
 
-Ensure the configuration files remain valid.
+Ensure Hub configuration files remain valid.
 
 This hubverse action installs the `hubAdmin` package from GitHub using pak as well as required system dependencies.
 

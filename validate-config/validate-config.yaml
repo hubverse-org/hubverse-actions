@@ -9,7 +9,7 @@ on:
       - '!**README**'
 
 jobs:
-  validate-submission:
+  validate-hub-config:
     runs-on: ubuntu-latest
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
@@ -28,14 +28,13 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          packages: any::gt, hubverse-org/hubValidations, any::sessioninfo
+          packages: hubverse-org/hubAdmin, any::sessioninfo
 
       - name: Run validations
         id: validate
         env:
           PR_NUMBER: ${{ github.event.number }}
         run: |
-          library("hubValidations")
           v <- hubAdmin::validate_hub_config(
             hub_path = "${{ github.workspace }}"
           )
@@ -46,7 +45,7 @@ jobs:
             # write output to HTML
             tbl <- hubAdmin::view_config_val_errors(v)
             writeLines("## :x: Invalid Configuration\n", "${{ github.workspace }}/diff.md")
-            cat("\nThe schema in `hub-config/` appear to be invalid. Details about the exact locations of the errors can be found in the table below.\n", file = "${{ github.workspace }}/diff.md", append = TRUE)
+            cat("\nErrors were detected in one or more config files in `hub-config/`. Details about the exact locations of the errors can be found in the table below.\n", file = "${{ github.workspace }}/diff.md", append = TRUE)
             cat(gt::as_raw_html(tbl), "\n", file = "${{ github.workspace }}/diff.md", sep = "", append = TRUE)
           } else {
             cat("result=true", "\n", file = Sys.getenv("GITHUB_OUTPUT"), sep = "", append = TRUE)
