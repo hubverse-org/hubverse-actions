@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      PR_NUMBER: ${{ github.event.number }}
+      DIFF_PATH: ${{ github.workspace }}/diff.md
 
     steps:
       - uses: actions/checkout@v3
@@ -32,14 +34,12 @@ jobs:
 
       - name: Run validations
         id: validate
-        env:
-          PR_NUMBER: ${{ github.event.number }}
         run: |
-          workspace <- "${{ github.workspace }}"
+          diff <- Sys.getenv("DIFF_PATH")
+          hub_path <- dirname(diff)
           output <- Sys.getenv("GITHUB_OUTPUT")
-          diff <- file.path(workspace, "diff.md")
           v <- hubAdmin::validate_hub_config(
-            hub_path = workspace
+            hub_path = hub_path
           )
           # check if there were any failures
           invalid <- any(vapply(v, isFALSE, logical(1)))
@@ -59,8 +59,8 @@ jobs:
         if: ${{ github.event_name != 'workflow_dispatch' && steps.validate.outputs.result == 'false' }}
         uses: carpentries/actions/comment-diff@main
         with:
-          pr: ${{ github.event.number }}
-          path: ${{ github.workspace }}/diff.md
+          pr: ${{ env.PR_NUMBER }}
+          path: ${{ env.DIFF_PATH }}
       - name: Error on Failure
         if: ${{ steps.validate.outputs.result == 'false' }}
         run: exit 1
