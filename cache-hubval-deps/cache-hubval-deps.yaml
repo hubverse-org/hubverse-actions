@@ -21,6 +21,7 @@ jobs:
         with:
           install-r: false
           use-public-rspm: true
+          extra-repositories: 'https://hubverse-org.r-universe.dev'
 
       - name: Update R
         run: |
@@ -28,4 +29,6 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          packages: hubverse-org/hubValidations, any::sessioninfo
+          packages: |
+            any::hubValidations
+            any::sessioninfo
