@@ -12,7 +12,34 @@ It then performs submission validation checks through function `hubAdmin::valida
 
 When invalid config files are discovered, a GitHub comment is created (or updated) with a table containing information about the exact locations of the failures using the [`hubAdmin::view_config_val_errors()`](https://hubverse-org.github.io/hubAdmin/reference/view_config_val_errors.html) function. 
 
-The action is triggered by pull requests onto the `main` branch which add or modify files in the `hub-config/` directory. For hubs and repositories which differ in configuration, workflow dispatch will need to be customised manually in the hubs workflow file.
+## Modifying
 
-The workflow default will validate files in the `hub-config` directory in the root of the repository. To change the path to the hub to be validated, change the default path defined in the `HUB_PATH` environment variable. For example,  to validate the config of a demo hub included as part of a package you could set `HUB_PATH` to `"inst/demo_hub"`.
+The action is triggered in two ways:
+
+1. By pull requests onto the `main` branch which add or modify files in the `hub-config/` directory. 
+2. Manually by an administrator of the hub on the repository's Actions interface.
+
+For hubs and repositories which differ in configuration, workflow dispatch will need to be customised manually in the hub's workflow file **in two places**: `on/pull_request/paths` and the `jobs/validate-hub-config/env/HUB_PATH` environment variable (see example below).
+
+For example, to validate the config of a demo hub included as part of a package you would want make sure the hub path is set to `"inst/demo_hub"`:
+
+```diff
+ on:
+   workflow_dispatch:
+   pull_request:
+     branches: main
+     paths:
+-      - 'hub-config/**'
++      - 'inst/demo_hub/hub-config/**'
+       - '!**README**'
+ 
+ jobs:
+   validate-hub-config:
+     runs-on: ubuntu-latest
+     env:
+       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+       PR_NUMBER: ${{ github.event.number }}
+-      HUB_PATH: ${{ github.workspace }}
++      HUB_PATH: ${{ github.workspace }}/inst/demo_hub
+```
 
