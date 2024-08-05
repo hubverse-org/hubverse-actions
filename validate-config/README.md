@@ -14,3 +14,5 @@ When invalid config files are discovered, a GitHub comment is created (or update
 
 The action is triggered by pull requests onto the `main` branch which add or modify files in the `hub-config/` directory. For hubs and repositories which differ in configuration, workflow dispatch will need to be customised manually in the hubs workflow file.
 
+The workflow default will validate files in the `hub-config` directory in the root of the repository. To change the path to the hub to be validated, change the default path defined in the `HUB_PATH` environment variable. For example,  to validate the config of a demo hub included as part of a package you could set `HUB_PATH` to `"inst/demo_hub"`.
+

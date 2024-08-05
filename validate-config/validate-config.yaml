@@ -14,7 +14,7 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       PR_NUMBER: ${{ github.event.number }}
-      DIFF_PATH: ${{ github.workspace }}/diff.md
+      HUB_PATH: ${{ github.workspace }}
 
     steps:
       - uses: actions/checkout@v4
@@ -39,8 +39,8 @@ jobs:
       - name: Run validations
         id: validate
         run: |
-          diff <- Sys.getenv("DIFF_PATH")
-          hub_path <- dirname(diff)
+          hub_path <- Sys.getenv("HUB_PATH")
+          diff <- file.path(hub_path, "diff.md")
           output <- Sys.getenv("GITHUB_OUTPUT")
           timestamp <- function(outfile) {
             stamp <- format(Sys.time(), usetz = TRUE, tz = "UTC")
@@ -71,7 +71,7 @@ jobs:
         uses: carpentries/actions/comment-diff@main
         with:
           pr: ${{ env.PR_NUMBER }}
-          path: ${{ env.DIFF_PATH }}
+          path: ${{ env.HUB_PATH }}/diff.md
       - name: Error on Failure
         if: ${{ steps.validate.outputs.result == 'false' }}
         run: |
