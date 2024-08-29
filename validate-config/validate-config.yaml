@@ -38,32 +38,7 @@ jobs:
 
       - name: Run validations
         id: validate
-        run: |
-          hub_path <- Sys.getenv("HUB_PATH")
-          diff <- file.path(hub_path, "diff.md")
-          output <- Sys.getenv("GITHUB_OUTPUT")
-          timestamp <- function(outfile) {
-            stamp <- format(Sys.time(), usetz = TRUE, tz = "UTC")
-            cat(stamp, "\n", file = outfile, sep = "", append = TRUE)
-          }
-          v <- hubAdmin::validate_hub_config(
-            hub_path = hub_path
-          )
-          # check if there were any failures
-          invalid <- any(vapply(v, isFALSE, logical(1)))
-          if (invalid) {
-            cat("result=false", "\n", file = output, sep = "", append = TRUE)
-            # write output to HTML
-            tbl <- hubAdmin::view_config_val_errors(v)
-            writeLines("## :x: Invalid Configuration\n", diff)
-            cat("\nErrors were detected in one or more config files in `hub-config/`. Details about the exact locations of the errors can be found in the table below.\n", file = diff, append = TRUE)
-            cat(gt::as_raw_html(tbl), "\n", file = diff, sep = "", append = TRUE)
-            timestamp(diff)
-          } else {
-            cat("result=true", "\n", file = output, sep = "", append = TRUE)
-            writeLines(":white_check_mark: Hub correctly configured!\n", diff)
-            timestamp(diff)
-          }
+        run: hubAdmin::ci_validate_hub_config(diff = "${{ runner.temp }}/diff.md")
         shell: Rscript {0}
       - name: "Comment on PR"
         id: comment-diff
@@ -71,7 +46,7 @@ jobs:
         uses: carpentries/actions/comment-diff@main
         with:
           pr: ${{ env.PR_NUMBER }}
-          path: ${{ env.HUB_PATH }}/diff.md
+          path: ${{ runner.temp }}/diff.md
       - name: Error on Failure
         if: ${{ steps.validate.outputs.result == 'false' }}
         run: |
