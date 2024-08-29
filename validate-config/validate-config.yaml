@@ -12,9 +12,9 @@ jobs:
   validate-hub-config:
     runs-on: ubuntu-latest
     env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       PR_NUMBER: ${{ github.event.number }}
       HUB_PATH: ${{ github.workspace }}
-      DIFF_PATH: ${{ runner.temp }}/diff.md
 
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +38,7 @@ jobs:
 
       - name: Run validations
         id: validate
-        run: hubAdmin::ci_validate_hub_config(diff = Sys.getenv("DIFF_PATH"))
+        run: hubAdmin::ci_validate_hub_config(diff = "${{ runner.temp }}/diff.md")
         shell: Rscript {0}
       - name: "Comment on PR"
         id: comment-diff
@@ -46,7 +46,7 @@ jobs:
         uses: carpentries/actions/comment-diff@main
         with:
           pr: ${{ env.PR_NUMBER }}
-          path: ${{ env.DIFF_PATH }}
+          path: ${{ runner.temp }}/diff.md
       - name: Error on Failure
         if: ${{ steps.validate.outputs.result == 'false' }}
         run: |
