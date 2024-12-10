@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-deps-cache-on-main:
-    if: ${{ github.repository_owner == github.repository_owner }}
+    if: github.event.repository.fork != true
     runs-on: ubuntu-latest
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
