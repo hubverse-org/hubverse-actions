@@ -35,7 +35,7 @@ For example, to validate the config of a demo hub included as part of a package 
  
  jobs:
    validate-hub-config:
-     runs-on: ubuntu-latest
+     runs-on: ubuntu-22.04
      env:
        GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
        PR_NUMBER: ${{ github.event.number }}
