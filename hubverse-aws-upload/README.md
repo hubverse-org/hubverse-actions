@@ -19,7 +19,7 @@ the action will skip AWS-related steps.
 
 ## AWS setup
 
-Before using this action, a member of the Hubverse development team will need to "onboard" the hub to AWS. Onboarding is
+Before using this action, a member of the Hubverse development team will need to ["onboard" the hub to AWS](https://github.com/hubverse-org/hubverse-infrastructure?tab=readme-ov-file#onboarding-a-hub). Onboarding is
 a one-time process that creates:
 
 - An AWS S3 bucket for the hub
@@ -27,4 +27,3 @@ a one-time process that creates:
 
 **Important**: The repo's write permissions are limited to the `main` branch. Running this action on another branch
 or on a fork will fail.
-
