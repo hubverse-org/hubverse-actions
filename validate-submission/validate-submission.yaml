@@ -9,6 +9,10 @@ on:
       - 'model-metadata/*'
       - '!**README**'
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
   validate-submission:
     runs-on: ubuntu-22.04

@@ -8,6 +8,10 @@ on:
       - 'hub-config/**'
       - '!**README**'
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   validate-hub-config:
     runs-on: ubuntu-22.04
