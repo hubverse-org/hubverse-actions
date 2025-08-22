@@ -22,9 +22,9 @@ jobs:
       HUB_PATH: ${{ github.workspace }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: r-lib/actions/setup-r@v2
+      - uses: r-lib/actions/setup-r@bd49c52ffe281809afa6f0fecbf37483c5dd0b93 #v2.11.3
         with:
           install-r: false
           use-public-rspm: true
@@ -34,7 +34,7 @@ jobs:
         run: |
           sudo apt-get update
 
-      - uses: r-lib/actions/setup-r-dependencies@v2
+      - uses: r-lib/actions/setup-r-dependencies@bd49c52ffe281809afa6f0fecbf37483c5dd0b93 #v2.11.3
         with:
           cache: 'always'
           packages: |
@@ -48,7 +48,7 @@ jobs:
       - name: "Comment on PR"
         id: comment-diff
         if: ${{ github.event_name != 'workflow_dispatch' }}
-        uses: carpentries/actions/comment-diff@main
+        uses: carpentries/actions/comment-diff@2e20fd5ee53b691e27455ce7ca3b16ea885140e8 #v0.15.0
         with:
           pr: ${{ env.PR_NUMBER }}
           path: ${{ runner.temp }}/diff.md
