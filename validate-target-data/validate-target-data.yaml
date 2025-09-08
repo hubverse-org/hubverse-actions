@@ -9,11 +9,10 @@ on:
       - 'target-data/time-series/**'
       - 'target-data/oracle-output.*'
       - 'target-data/oracle-output/**'
-    paths-ignore:
-      - '**/README'
-      - '**/README.*'
-      - '**/readme'
-      - '**/readme.*'
+      - '!**/README'
+      - '!**/README.*'
+      - '!**/readme'
+      - '!**/readme.*'
 
 permissions:
   contents: read
