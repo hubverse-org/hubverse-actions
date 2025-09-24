@@ -2,7 +2,7 @@
 
 Ensure Hub configuration files remain valid.
 
-This hubverse action installs the `hubAdmin` package from GitHub using pak as well as required system dependencies.
+This hubverse action installs the `hubAdmin` package from the [hubverse R universe](https://hubverse-org.r-universe.dev/packages) using pak as well as required system dependencies.
 
 It then performs submission validation checks through function `hubAdmin::validate_hub_config()` and assumes you have all three of the required configuration JSON files in your `hub-config/` directory:
 
