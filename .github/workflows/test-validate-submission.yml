@@ -44,6 +44,10 @@ jobs:
           hub_path: testhub
           gh_repo: hubverse-org/ci-testhub-simple
           pr_number: ${{ matrix.pr }}
+          # Fixtures are frozen in 2022, so their submission windows are closed;
+          # skip the only wall-clock-relative check so the assertion tests the
+          # submission content, not the current date.
+          skip_submit_window_check: true
 
       - name: Assert outcome is ${{ matrix.expect }}
         run: |
