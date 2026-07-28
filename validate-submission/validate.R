@@ -26,8 +26,6 @@ env_csv <- function(name) {
   trimws(strsplit(value, ",", fixed = TRUE)[[1]])
 }
 
-library("hubValidations")
-
 v <- hubValidations::validate_pr(
   hub_path = Sys.getenv("HUB_PATH"),
   gh_repo = Sys.getenv("GH_REPO"),
