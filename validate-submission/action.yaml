@@ -1,0 +1,109 @@
+name: "Hub submission validation"
+description: >-
+  Validate the model-output and model-metadata files in a hub pull request with
+  hubValidations::validate_pr().
+author: "hubverse"
+
+inputs:
+  # validate_pr() passthrough
+  hub_path:
+    description: "Path to the hub, relative to the checkout root."
+    default: "."
+  gh_repo:
+    description: "Hub repository as owner/name. Defaults to the workflow repository."
+    default: ${{ github.repository }}
+  pr_number:
+    description: "Pull request number to validate. Defaults to the triggering pull request."
+    default: ${{ github.event.number }}
+  round_id_col:
+    description: >-
+      Name of the column containing round IDs. Leave empty unless files carry a
+      round ID column that has not been configured in tasks.json.
+    default: ""
+  output_type_id_datatype:
+    description: >-
+      Data type to coerce the output_type_id column to: from_config, auto,
+      character, double, integer, logical or Date.
+    default: "from_config"
+  validations_cfg_path:
+    description: "Path to a custom validations config file. Empty uses the hub default."
+    default: ""
+  skip_submit_window_check:
+    description: "Skip the submission window check (true/false)."
+    default: "false"
+  file_modification_check:
+    description: >-
+      How to treat modification/deletion of previously submitted files: error,
+      failure, warn, message or none.
+    default: "error"
+  allow_submit_window_mods:
+    description: >-
+      Allow modification/deletion of model-output files within their submission
+      window (true/false).
+    default: "true"
+  submit_window_ref_date_from:
+    description: "Where to take the submission window reference date from: file or file_path."
+    default: "file"
+  derived_task_ids:
+    description: "Comma-separated task IDs derived from other task IDs. Empty for none."
+    default: ""
+  # check_for_errors() passthrough
+  verbose:
+    description: "Print the result of every check before the summary (true/false)."
+    default: "true"
+  show_warnings:
+    description: "Print check-level warnings inline with their checks (true/false)."
+    default: "false"
+  # environment / setup
+  extra_packages:
+    description: >-
+      Additional R packages to install, using setup-r-dependencies `extra-packages`
+      syntax (one per line). Use for custom validation checks that need extra deps.
+    default: ""
+  extra_repositories:
+    description: "Extra R package repositories passed to setup-r."
+    default: "https://hubverse-org.r-universe.dev"
+  github_token:
+    description: "Token used to read pull request files via the GitHub API."
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - uses: r-lib/actions/setup-r@v2
+      with:
+        install-r: false
+        use-public-rspm: true
+        extra-repositories: ${{ inputs.extra_repositories }}
+
+    - name: Update apt
+      shell: bash
+      run: sudo apt-get update
+
+    - uses: r-lib/actions/setup-r-dependencies@v2
+      env:
+        GITHUB_PAT: ${{ inputs.github_token }}
+      with:
+        packages: |
+          any::hubValidations
+          any::sessioninfo
+        extra-packages: ${{ inputs.extra_packages }}
+
+    - name: Run submission validations
+      shell: bash
+      env:
+        GITHUB_PAT: ${{ inputs.github_token }}
+        HUB_PATH: ${{ inputs.hub_path }}
+        GH_REPO: ${{ inputs.gh_repo }}
+        PR_NUMBER: ${{ inputs.pr_number }}
+        ROUND_ID_COL: ${{ inputs.round_id_col }}
+        OUTPUT_TYPE_ID_DATATYPE: ${{ inputs.output_type_id_datatype }}
+        VALIDATIONS_CFG_PATH: ${{ inputs.validations_cfg_path }}
+        SKIP_SUBMIT_WINDOW_CHECK: ${{ inputs.skip_submit_window_check }}
+        FILE_MODIFICATION_CHECK: ${{ inputs.file_modification_check }}
+        ALLOW_SUBMIT_WINDOW_MODS: ${{ inputs.allow_submit_window_mods }}
+        SUBMIT_WINDOW_REF_DATE_FROM: ${{ inputs.submit_window_ref_date_from }}
+        DERIVED_TASK_IDS: ${{ inputs.derived_task_ids }}
+        VERBOSE: ${{ inputs.verbose }}
+        SHOW_WARNINGS: ${{ inputs.show_warnings }}
+      run: Rscript "${GITHUB_ACTION_PATH}/validate.R"

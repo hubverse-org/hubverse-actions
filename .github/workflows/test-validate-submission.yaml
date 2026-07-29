@@ -1,0 +1,59 @@
+name: Test validate-submission action
+
+# Exercises the validate-submission composite action (referenced locally) against
+# the standing fixture PRs in hubverse-org/ci-testhub-simple, asserting each
+# produces its expected pass/fail outcome.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'validate-submission/**'
+      - '.github/workflows/test-validate-submission.yaml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pr: 4   # add valid submission -> passes
+            expect: success
+          - pr: 5   # missing task ID combination -> fails
+            expect: failure
+    steps:
+      - name: Checkout the action under test
+        uses: actions/checkout@v7
+
+      - name: Checkout the fixture hub at the PR head
+        uses: actions/checkout@v7
+        with:
+          repository: hubverse-org/ci-testhub-simple
+          ref: refs/pull/${{ matrix.pr }}/head
+          path: testhub
+
+      - name: Validate fixture PR ${{ matrix.pr }}
+        id: validate
+        continue-on-error: true
+        uses: ./validate-submission
+        with:
+          hub_path: testhub
+          gh_repo: hubverse-org/ci-testhub-simple
+          pr_number: ${{ matrix.pr }}
+          # Fixtures are frozen in 2022, so their submission windows are closed;
+          # skip the only wall-clock-relative check so the assertion tests the
+          # submission content, not the current date.
+          skip_submit_window_check: true
+
+      - name: Assert outcome is ${{ matrix.expect }}
+        run: |
+          if [ "${{ steps.validate.outcome }}" != "${{ matrix.expect }}" ]; then
+            echo "::error::PR ${{ matrix.pr }}: expected '${{ matrix.expect }}', got '${{ steps.validate.outcome }}'"
+            exit 1
+          fi
+          echo "PR ${{ matrix.pr }}: outcome '${{ steps.validate.outcome }}' as expected"
