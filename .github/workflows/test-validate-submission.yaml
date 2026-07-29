@@ -9,7 +9,7 @@ on:
   pull_request:
     paths:
       - 'validate-submission/**'
-      - '.github/workflows/test-validate-submission.yml'
+      - '.github/workflows/test-validate-submission.yaml'
 
 permissions:
   contents: read

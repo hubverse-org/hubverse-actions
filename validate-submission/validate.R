@@ -6,7 +6,7 @@
 # vector); plain string arguments are read directly. It then runs the validation
 # and raises on failure via check_for_errors().
 #
-# Input defaults live in action.yml, which always sets these variables, so this
+# Input defaults live in action.yaml, which always sets these variables, so this
 # script does not restate them.
 
 env_or_null <- function(name) {
@@ -15,7 +15,7 @@ env_or_null <- function(name) {
 }
 
 env_lgl <- function(name) {
-  tolower(Sys.getenv(name)) %in% c("true", "1", "yes")
+  tolower(Sys.getenv(name)) == "true"
 }
 
 env_csv <- function(name) {

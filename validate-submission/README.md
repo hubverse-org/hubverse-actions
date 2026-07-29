@@ -14,7 +14,7 @@ This directory provides two things:
   It is scaffolded into a hub with `hubCI::use_hub_github_action("validate-submission")`
   and triggers on pull requests that add or modify files under `model-output/` or
   `model-metadata/`.
-- **A composite action** (`action.yml`) holding the logic, which the template
+- **A composite action** (`action.yaml`) holding the logic, which the template
   calls and which advanced hubs can drop into their own workflows.
 
 ## Using the action directly
