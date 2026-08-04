@@ -1,0 +1,102 @@
+name: "Upsert a PR comment"
+description: >-
+  Create or update a single pull request comment identified by a marker key, so
+  each workflow reliably owns and updates its own comment.
+author: "hubverse"
+
+inputs:
+  pr:
+    description: "Pull request number to comment on."
+    required: true
+  header:
+    description: >-
+      Unique key identifying this comment. Each distinct header keeps its own
+      sticky comment on the PR, so different workflows do not clobber each other.
+      Must be a slug of letters, digits, `-` or `_`.
+    required: true
+  body:
+    description: "Comment body (markdown). Provide this or body_path."
+    default: ""
+  body_path:
+    description: "Path to a file holding the comment body. Takes precedence over body."
+    default: ""
+  revision:
+    description: >-
+      Optional revision key, e.g. the PR head commit SHA. When it changes, a new
+      comment is posted (which notifies) and earlier revisions' comments are left
+      in place, building a history across commits; a re-run with the same revision
+      edits that revision's comment in place. When unset, a single comment is kept
+      and edited in place.
+    default: ""
+  token:
+    description: "Token used to read and write PR comments."
+    default: ${{ github.token }}
+
+outputs:
+  comment-id:
+    description: "ID of the comment that was created or updated."
+    value: ${{ steps.comment.outputs.comment-id }}
+
+runs:
+  using: composite
+  steps:
+    - id: comment
+      uses: actions/github-script@v7
+      env:
+        PR: ${{ inputs.pr }}
+        HEADER: ${{ inputs.header }}
+        BODY: ${{ inputs.body }}
+        BODY_PATH: ${{ inputs.body_path }}
+        REVISION: ${{ inputs.revision }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const fs = require('fs');
+          const header = process.env.HEADER;
+          const revision = process.env.REVISION;
+          if (!/^[A-Za-z0-9_-]+$/.test(header)) {
+            core.setFailed(`pr-comment: \`header\` must be a slug of letters, digits, \`-\` or \`_\`; got "${header}".`);
+            return;
+          }
+          // Fold the revision into the marker: a new revision yields a new marker,
+          // so no existing comment matches and a fresh comment is posted, leaving
+          // earlier revisions' comments in place. Same revision (or none) matches
+          // and edits in place.
+          const marker = `<!-- hubverse-comment:${header}${revision ? `:${revision}` : ''} -->`;
+
+          const bodyPath = process.env.BODY_PATH;
+          if (bodyPath && !fs.existsSync(bodyPath)) {
+            core.setFailed(`pr-comment: body_path not found: ${bodyPath}`);
+            return;
+          }
+          const raw = bodyPath ? fs.readFileSync(bodyPath, 'utf8') : process.env.BODY;
+          if (!raw.trim()) {
+            core.setFailed('pr-comment: empty body (set `body` or `body_path`).');
+            return;
+          }
+          const body = `${marker}\n${raw}`;
+
+          const issue_number = Number(process.env.PR);
+          if (!Number.isInteger(issue_number) || issue_number <= 0) {
+            core.setFailed(`pr-comment: invalid pr number "${process.env.PR}".`);
+            return;
+          }
+
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            ...context.repo,
+            issue_number,
+            per_page: 100,
+          });
+          const existing = comments.find((c) => c.body && c.body.includes(marker));
+
+          let id;
+          if (existing) {
+            await github.rest.issues.updateComment({ ...context.repo, comment_id: existing.id, body });
+            id = existing.id;
+            core.info(`Updated comment ${id} (header: ${header}).`);
+          } else {
+            const { data } = await github.rest.issues.createComment({ ...context.repo, issue_number, body });
+            id = data.id;
+            core.info(`Created comment ${id} (header: ${header}).`);
+          }
+          core.setOutput('comment-id', id);

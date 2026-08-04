@@ -1,0 +1,193 @@
+name: Test pr-comment action
+
+# Self-tests the pr-comment action (referenced locally) against this PR. One job
+# checks sticky behaviour (create then update-in-place, same comment id); another
+# checks the revision behaviour (same revision edits in place, a new revision
+# reposts a fresh comment); a third checks that invalid headers are rejected.
+# Each cleans up the comment it creates.
+
+on:
+  pull_request:
+    paths:
+      - 'pr-comment/**'
+      - '.github/workflows/test-pr-comment.yaml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  sticky:
+    # Fork PRs get a read-only GITHUB_TOKEN and cannot post comments, so these
+    # self-tests can only run on same-repo PRs.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Create the sticky comment (via body)
+        id: create
+        uses: ./pr-comment
+        with:
+          pr: ${{ github.event.number }}
+          header: ci-selftest
+          body: "pr-comment self-test: created."
+
+      - name: Write an updated body to a file
+        shell: bash
+        run: |
+          echo "pr-comment self-test: updated via body_path." > "${{ runner.temp }}/comment.md"
+
+      - name: Update the sticky comment (via body_path, same header)
+        id: update
+        uses: ./pr-comment
+        with:
+          pr: ${{ github.event.number }}
+          header: ci-selftest
+          body_path: ${{ runner.temp }}/comment.md
+
+      - name: Assert one comment, updated in place, then clean up
+        uses: actions/github-script@v7
+        env:
+          ID_CREATE: ${{ steps.create.outputs.comment-id }}
+          ID_UPDATE: ${{ steps.update.outputs.comment-id }}
+        with:
+          script: |
+            if (process.env.ID_UPDATE !== process.env.ID_CREATE) {
+              core.setFailed(`sticky update should keep the same comment id: ${process.env.ID_CREATE} -> ${process.env.ID_UPDATE}`);
+              return;
+            }
+            const marker = '<!-- hubverse-comment:ci-selftest -->';
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const mine = comments.filter((c) => c.body && c.body.includes(marker));
+            if (mine.length !== 1) {
+              core.setFailed(`expected exactly 1 sticky comment, found ${mine.length}`);
+              return;
+            }
+            if (!mine[0].body.includes('updated via body_path')) {
+              core.setFailed('sticky comment was not updated in place');
+              return;
+            }
+            await github.rest.issues.deleteComment({ ...context.repo, comment_id: mine[0].id });
+            core.info('sticky self-test passed; test comment removed.');
+
+  revision:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Post at revision A
+        id: a
+        uses: ./pr-comment
+        with:
+          pr: ${{ github.event.number }}
+          header: ci-selftest-revision
+          revision: rev-a
+          body: "revision self-test: A."
+
+      - name: Update at revision A (same revision, edits in place)
+        id: a2
+        uses: ./pr-comment
+        with:
+          pr: ${{ github.event.number }}
+          header: ci-selftest-revision
+          revision: rev-a
+          body: "revision self-test: A updated."
+
+      - name: Post at revision B (new revision, reposts fresh)
+        id: b
+        uses: ./pr-comment
+        with:
+          pr: ${{ github.event.number }}
+          header: ci-selftest-revision
+          revision: rev-b
+          body: "revision self-test: B."
+
+      - name: Assert same-revision edits in place, new revision adds a comment
+        uses: actions/github-script@v7
+        env:
+          ID_A: ${{ steps.a.outputs.comment-id }}
+          ID_A2: ${{ steps.a2.outputs.comment-id }}
+          ID_B: ${{ steps.b.outputs.comment-id }}
+        with:
+          script: |
+            if (process.env.ID_A2 !== process.env.ID_A) {
+              core.setFailed(`same revision should edit in place: ${process.env.ID_A} -> ${process.env.ID_A2}`);
+              return;
+            }
+            if (process.env.ID_B === process.env.ID_A) {
+              core.setFailed('a new revision should post a new comment, but the id was unchanged');
+              return;
+            }
+            const prefix = '<!-- hubverse-comment:ci-selftest-revision:';
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const mine = comments.filter((c) => c.body && c.body.includes(prefix));
+            if (mine.length !== 2) {
+              core.setFailed(`expected 2 comments (one per revision), found ${mine.length}`);
+              return;
+            }
+            const byId = Object.fromEntries(mine.map((c) => [String(c.id), c]));
+            const a = byId[process.env.ID_A];
+            const b = byId[process.env.ID_B];
+            if (!a || !a.body.includes('revision self-test: A updated')) {
+              core.setFailed('revision A comment missing or not updated in place');
+              return;
+            }
+            if (!b || !b.body.includes('revision self-test: B')) {
+              core.setFailed('revision B comment missing or has wrong content');
+              return;
+            }
+            for (const c of mine) {
+              await github.rest.issues.deleteComment({ ...context.repo, comment_id: c.id });
+            }
+            core.info('revision self-test passed; test comments removed.');
+
+  invalid-header:
+    # The header guard runs before any API call, so no comment is posted and this
+    # job works on fork PRs too, where the read-only token blocks the jobs above.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Omitted header
+        id: omitted
+        continue-on-error: true
+        uses: ./pr-comment
+        with:
+          pr: ${{ github.event.number }}
+          body: "invalid-header self-test: must never be posted."
+
+      - name: Header containing a colon
+        id: colon
+        continue-on-error: true
+        uses: ./pr-comment
+        with:
+          pr: ${{ github.event.number }}
+          header: "ci-selftest:not-a-slug"
+          body: "invalid-header self-test: must never be posted."
+
+      - name: Assert both were rejected
+        shell: bash
+        env:
+          OMITTED: ${{ steps.omitted.outcome }}
+          COLON: ${{ steps.colon.outcome }}
+        run: |
+          status=0
+          if [ "$OMITTED" != failure ]; then
+            echo "an omitted header should fail the step, got: $OMITTED"
+            status=1
+          fi
+          if [ "$COLON" != failure ]; then
+            echo "a header containing ':' should fail the step, got: $COLON"
+            status=1
+          fi
+          exit "$status"
