@@ -12,6 +12,7 @@ inputs:
     description: >-
       Unique key identifying this comment. Each distinct header keeps its own
       sticky comment on the PR, so different workflows do not clobber each other.
+      Must be a slug of letters, digits, `-` or `_`.
     required: true
   body:
     description: "Comment body (markdown). Provide this or body_path."
@@ -53,6 +54,10 @@ runs:
           const fs = require('fs');
           const header = process.env.HEADER;
           const revision = process.env.REVISION;
+          if (!/^[A-Za-z0-9_-]+$/.test(header)) {
+            core.setFailed(`pr-comment: \`header\` must be a slug of letters, digits, \`-\` or \`_\`; got "${header}".`);
+            return;
+          }
           // Fold the revision into the marker: a new revision yields a new marker,
           // so no existing comment matches and a fresh comment is posted, leaving
           // earlier revisions' comments in place. Same revision (or none) matches

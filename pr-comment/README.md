@@ -32,7 +32,7 @@ steps:
 | Input | Default | Description |
 |---|---|---|
 | `pr` | *(required)* | Pull request number to comment on. |
-| `header` | *(required)* | Unique key for this comment; each header owns one sticky comment. |
+| `header` | *(required)* | Unique key for this comment; each header owns one sticky comment. Must be a slug of letters, digits, `-` or `_`. |
 | `body` | *(empty)* | Comment body (markdown). Provide this or `body_path`. |
 | `body_path` | *(empty)* | Path to a file holding the body. Takes precedence over `body`. |
 | `revision` | *(empty)* | Optional key (e.g. the PR head commit SHA) enabling per-revision comments. See [Notifying on changes](#notifying-on-changes). |
@@ -72,8 +72,9 @@ artifact instead of the event context.
 
 ## Notes
 
-- `header` should be a simple slug (letters, digits, `-`, `_`); it is embedded in
-  an HTML comment marker used to find the comment again.
+- `header` must be a slug of letters, digits, `-` or `_`; it is embedded in an
+  HTML comment marker used to find the comment again. Anything else fails the
+  step.
 - Create-or-update is not atomic. Two runs with the same `header` racing on one
   PR can each create a comment, so callers that may fire concurrently should
   serialise with a workflow [`concurrency`](https://docs.github.com/actions/using-jobs/using-concurrency)

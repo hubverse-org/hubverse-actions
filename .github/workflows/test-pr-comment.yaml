@@ -3,7 +3,8 @@ name: Test pr-comment action
 # Self-tests the pr-comment action (referenced locally) against this PR. One job
 # checks sticky behaviour (create then update-in-place, same comment id); another
 # checks the revision behaviour (same revision edits in place, a new revision
-# reposts a fresh comment). Each cleans up the comment it creates.
+# reposts a fresh comment); a third checks that invalid headers are rejected.
+# Each cleans up the comment it creates.
 
 on:
   pull_request:
@@ -149,3 +150,44 @@ jobs:
               await github.rest.issues.deleteComment({ ...context.repo, comment_id: c.id });
             }
             core.info('revision self-test passed; test comments removed.');
+
+  invalid-header:
+    # The header guard runs before any API call, so no comment is posted and this
+    # job works on fork PRs too, where the read-only token blocks the jobs above.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Omitted header
+        id: omitted
+        continue-on-error: true
+        uses: ./pr-comment
+        with:
+          pr: ${{ github.event.number }}
+          body: "invalid-header self-test: must never be posted."
+
+      - name: Header containing a colon
+        id: colon
+        continue-on-error: true
+        uses: ./pr-comment
+        with:
+          pr: ${{ github.event.number }}
+          header: "ci-selftest:not-a-slug"
+          body: "invalid-header self-test: must never be posted."
+
+      - name: Assert both were rejected
+        shell: bash
+        env:
+          OMITTED: ${{ steps.omitted.outcome }}
+          COLON: ${{ steps.colon.outcome }}
+        run: |
+          status=0
+          if [ "$OMITTED" != failure ]; then
+            echo "an omitted header should fail the step, got: $OMITTED"
+            status=1
+          fi
+          if [ "$COLON" != failure ]; then
+            echo "a header containing ':' should fail the step, got: $COLON"
+            status=1
+          fi
+          exit "$status"
