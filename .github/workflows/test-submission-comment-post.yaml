@@ -1,0 +1,65 @@
+name: Test submission comment flow (post)
+
+# Stage 2 of the self-test, and the same shape a hub uses: a separate workflow
+# listening for the first one finishing, calling the shared workflow that hubs
+# call. So this exercises the real posting path rather than a copy of it.
+#
+# It only starts working once on the default branch, since `workflow_run` fires
+# only for workflow files already there. The `verify` job asserts the comment
+# landed on the right pull request and removes it.
+
+on:
+  workflow_run:
+    workflows: ["Test submission comment flow"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  comment:
+    uses: ./.github/workflows/post-validation-comment.yaml
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    with:
+      artifact_name: comment-flow-selftest
+      header: ci-comment-flow
+
+  verify:
+    needs: comment
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - id: pr
+        uses: hubverse-org/hubverse-actions/resolve-pr@main
+
+      - name: Assert it landed on the right pull request, then clean up
+        if: steps.pr.outputs.number != ''
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        with:
+          script: |
+            const issue_number = Number(process.env.PR_NUMBER);
+            const marker = `<!-- hubverse-comment:ci-comment-flow:${process.env.HEAD_SHA} -->`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number,
+              per_page: 100,
+            });
+            const mine = comments.filter((c) => c.body && c.body.includes(marker));
+            if (mine.length !== 1) {
+              core.setFailed(`expected exactly 1 comment on PR ${issue_number}, found ${mine.length}`);
+              return;
+            }
+            if (!mine[0].body.includes('comment-flow self-test')) {
+              core.setFailed('the posted comment does not carry the stub summary');
+              return;
+            }
+            await github.rest.issues.deleteComment({ ...context.repo, comment_id: mine[0].id });
+            core.info(`comment flow self-test passed on PR ${issue_number}; test comment removed.`);

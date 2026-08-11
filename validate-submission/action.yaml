@@ -61,8 +61,9 @@ inputs:
     default: "false"
   artifact_name:
     description: >-
-      Name of the artifact the summary is uploaded as. Must match the
-      `artifact_name` the companion comment workflow reads.
+      Name of the artifact the summary is uploaded as. Coordination between this
+      action and the workflow that posts the result, not a hub setting — change
+      it only if you also pass a matching `artifact_name` to that workflow.
     default: "submission-validation-results"
   # environment / setup
   extra_packages:
@@ -144,8 +145,11 @@ runs:
     # Validation writes no summary if it never got as far as running — a failed
     # apt update, an r-universe outage. Without this the artifact would carry
     # nothing to post and the submitter would be back to a bare red cross.
+    #
+    # Deliberately duplicates the shape summary.R produces: R may never have
+    # installed, so this cannot go through render_exec_error().
     - name: Fall back to a summary if validation could not run
-      if: always() && inputs.summary == 'true'
+      if: ${{ !cancelled() && steps.paths.outputs.summary != '' }}
       shell: bash
       env:
         SUMMARY: ${{ steps.paths.outputs.summary }}
@@ -153,7 +157,6 @@ runs:
         if [ -s "$SUMMARY" ]; then
           exit 0
         fi
-        mkdir -p "$(dirname "$SUMMARY")"
         cat > "$SUMMARY" <<'EOF'
         ## Submission validation
 
@@ -161,7 +164,7 @@ runs:
         EOF
 
     - name: Upload the summary
-      if: always() && inputs.summary == 'true'
+      if: ${{ !cancelled() && steps.paths.outputs.summary != '' }}
       uses: actions/upload-artifact@v5
       with:
         name: ${{ inputs.artifact_name }}

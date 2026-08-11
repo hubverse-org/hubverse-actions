@@ -3,7 +3,7 @@ name: Test pr-comment action
 # Self-tests the pr-comment action (referenced locally) against this PR. One job
 # checks sticky behaviour (create then update-in-place, same comment id); another
 # checks the revision behaviour (same revision edits in place, a new revision
-# reposts a fresh comment); a third checks that invalid headers are rejected.
+# reposts a fresh comment); a third checks that invalid inputs are rejected.
 # Each cleans up the comment it creates.
 
 on:
@@ -172,8 +172,8 @@ jobs:
               core.setFailed('a SHA revision should be abbreviated in the footer');
               return;
             }
-            for (const c of mine) {
-              await github.rest.issues.deleteComment({ ...context.repo, comment_id: c.id });
+            for (const comment of mine) {
+              await github.rest.issues.deleteComment({ ...context.repo, comment_id: comment.id });
             }
             core.info('revision self-test passed; test comments removed.');
 
@@ -221,16 +221,12 @@ jobs:
           REVISION: ${{ steps.revision.outcome }}
         run: |
           status=0
-          if [ "$OMITTED" != failure ]; then
-            echo "an omitted header should fail the step, got: $OMITTED"
+          check() {
+            [ "$2" = failure ] && return 0
+            echo "$1 should fail the step, got: $2"
             status=1
-          fi
-          if [ "$COLON" != failure ]; then
-            echo "a header containing ':' should fail the step, got: $COLON"
-            status=1
-          fi
-          if [ "$REVISION" != failure ]; then
-            echo "a revision containing '-->' should fail the step, got: $REVISION"
-            status=1
-          fi
+          }
+          check "an omitted header" "$OMITTED"
+          check "a header containing ':'" "$COLON"
+          check "a revision containing '-->'" "$REVISION"
           exit "$status"

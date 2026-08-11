@@ -13,7 +13,7 @@ Everything in this directory serves that one job:
 
 | File | What it does |
 |---|---|
-| `validate-submission.yaml` | The workflow you add to your hub — the file GitHub runs. Most hubs use it exactly as it comes. |
+| `validate-submission.yaml` | The workflow you add to your hub — the file GitHub runs. Most hubs use it exactly as it comes. Its companion, [`validate-submission-comment`](../validate-submission-comment), posts the result. |
 | `action.yaml` | The action it calls — a reusable piece of work: sets up R, runs the checks, writes up the result. |
 | `validate.R`, `summary.R` | The R behind it — running the checks, and turning their output into a comment. |
 | `tests/` | Checks on the comment formatting, run in this repository's own CI. |
@@ -24,10 +24,14 @@ From the root of your hub:
 
 ```r
 hubCI::use_hub_github_action("validate-submission")
+hubCI::use_hub_github_action("validate-submission-comment")
 ```
 
-That adds `.github/workflows/validate-submission.yaml`. There is nothing else to
-do — commenting is on by default, and the common case needs no settings at all.
+Two workflows, because one runs the checks and the other posts the result — see
+[how it works](#how-it-works) for why that has to be split. Commenting is on by
+default and the common case needs no settings at all. Without the second, the
+checks still run and still fail the pull request; the result just never reaches
+the submitter.
 
 ## What a submitter sees
 
@@ -56,7 +60,7 @@ flowchart TB
         B --> C --> D
     end
 
-    subgraph s2["Stage 2 · runs as your hub · allowed to comment"]
+    subgraph s2["Stage 2 · validate-submission-comment · runs as your hub"]
         E["comment job"]
         F["post-validation-comment<br/>shared workflow"]
         G["resolve-pr<br/>which pull request was this?"]
@@ -74,11 +78,15 @@ fork's pull request **read-only** access — otherwise anyone who opened a pull
 request could make your hub act on their behalf. So the job that runs the checks
 is not allowed to comment on its own result.[^token]
 
-The work is split in two because of that. `validate` runs on the pull request,
-does the checks, and saves the result to the workflow run. `comment` runs once
-that finishes, as your hub rather than as the submitter, and posts it. It only
-ever handles the saved file — it never checks out or runs anything from the pull
+The work is split in two because of that. This workflow runs on the pull request,
+does the checks, and saves the result to the workflow run.
+[`validate-submission-comment`](../validate-submission-comment) runs once that
+finishes, as your hub rather than as the submitter, and posts it. It only ever
+handles the saved file — it never checks out or runs anything from the pull
 request — so a submission cannot get at the permissions it holds.[^triggers]
+
+They have to be two separate files: GitHub rejects a workflow that names itself
+as its own trigger, with `Workflow '...' cannot listen to itself`.
 
 The saved file is not trusted either. A submission from a fork runs its own copy
 of the `validate` job, so it controls what ends up in that file. This is why
@@ -97,14 +105,10 @@ parts you might genuinely want to adjust, and the machinery behind them stays on
 our side, where you pick up fixes automatically instead of having to add a fresh
 copy of the file every time something changes.
 
-Two things worth knowing:
-
-- Stage 2 finds Stage 1 **by the workflow's name**. If you rename the workflow,
-  change the `workflows:` list in the same file to match, or results will quietly
-  stop being posted. Nothing reports an error when this happens.
-- Because the workflow starts Stage 2 when it finishes, you will see an extra run
-  in the Actions tab with every job skipped. That is expected, and it goes no
-  further than one.
+Stage 2 finds Stage 1 **by the workflow's name**. If you rename this workflow,
+change the `workflows:` list in `validate-submission-comment.yaml` to match, or
+results will quietly stop being posted. Nothing reports an error when the two
+stop matching.
 
 If the pull request is closed or merged in the gap between the checks finishing
 and the comment being posted, there is nothing to comment on, and the job simply
@@ -143,8 +147,8 @@ takes is available as a setting. Add them under `with:` on the
 | `derived_task_ids` | *(empty)* | Comma-separated task IDs derived from other task IDs. |
 | `verbose` | `true` | Print the result of every check before the summary. |
 | `show_warnings` | `false` | Print check-level warnings inline. |
-| `summary` | `false`, but `true` in the template | Write up the result and save it for the comment job to post. Turn off to keep results in the workflow log only. |
-| `artifact_name` | `submission-validation-results` | Name the result is saved under. Must match the name the comment job looks for. |
+| `summary` | `false`, but `true` in the template | Write up the result and save it for the companion workflow to post. Turn it off to keep results in the workflow log only; the companion workflow then finds nothing to post and stops quietly, so you can leave or delete it. |
+| `artifact_name` | `submission-validation-results` | Name the result is saved under. Coordination between the two workflows rather than a setting to change. |
 | `extra_packages` | *(empty)* | Extra R packages to install, for custom checks that need them. |
 | `extra_repositories` | hubverse r-universe | Extra R package repositories. |
 | `github_token` | `${{ github.token }}` | Token used to read the pull request's files. |

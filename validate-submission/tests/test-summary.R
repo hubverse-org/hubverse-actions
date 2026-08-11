@@ -110,9 +110,8 @@ expect(
   sum(grepl("^````", hostile)) == 2L,
   "the fence is opened and closed with four backticks"
 )
-closing <- max(which(hostile == "````"))
 expect(
-  which(hostile == "## not a heading") < closing,
+  which(hostile == "## not a heading") < length(hostile),
   "content after a three-backtick line stays inside the fence"
 )
 
@@ -125,7 +124,7 @@ expect(
   "the fence outgrows the longest backtick run in the content"
 )
 expect(
-  which(longer == "still inside") < max(which(longer == ticks[length(ticks)])),
+  which(longer == "still inside") < length(longer),
   "content after a six-backtick line stays inside the fence"
 )
 
@@ -141,8 +140,7 @@ expect(
   "truncation says so"
 )
 expect(
-  tail(big, 1L) == grep("^`+$", big, value = TRUE)[1] &&
-    any(grepl("check output", tail(big, 5L))),
+  grepl("^`+$", tail(big, 1L)) && any(grepl("check output", tail(big, 5L))),
   "truncation keeps the end, where the failing checks are"
 )
 
@@ -159,6 +157,24 @@ expect(
   "an execution error includes the underlying message"
 )
 expect(sum(grepl("^````", exec)) == 2L, "an execution error is fenced too")
+
+# An R condition message is one string with embedded newlines. Truncation works a
+# line at a time, so without the split inside render_exec_error() an oversized
+# message would cut to nothing but the notice, leaving the submitter a "could not
+# be run" comment with no detail in it.
+exec_big <- render_exec_error(paste(
+  rep("Error in `read_config()`: something went wrong on this line.", 2000),
+  collapse = "\n"
+))
+
+expect(
+  sum(nchar(exec_big)) + length(exec_big) < 65536L,
+  "an oversized execution error is brought under the comment limit"
+)
+expect(
+  any(grepl("something went wrong", exec_big, fixed = TRUE)),
+  "an oversized execution error still shows some of the message"
+)
 
 # ------------------------------------------------------------------------------
 

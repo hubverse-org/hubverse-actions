@@ -54,6 +54,7 @@ fail <- function(message) {
   quit(status = 1)
 }
 
+# The action creates this directory when it decides where the summary goes.
 summary_path <- Sys.getenv("SUMMARY_PATH")
 
 if (!nzchar(summary_path)) {
@@ -62,40 +63,40 @@ if (!nzchar(summary_path)) {
     verbose = env_lgl("VERBOSE"),
     show_warnings = env_lgl("SHOW_WARNINGS")
   )
-} else {
-  dir.create(dirname(summary_path), recursive = TRUE, showWarnings = FALSE)
+  quit(status = 0)
+}
 
-  v <- tryCatch(validate(), error = identity)
-  if (inherits(v, "error")) {
-    writeLines(
-      render_exec_error(conditionMessage(v)),
-      summary_path,
-      useBytes = TRUE
-    )
-    writeLines(conditionMessage(v), stderr())
-    fail(
-      "Submission validation could not be run. See the pull request comment, or the error above, for details."
-    )
-  }
+# Colour off for the same reason capture_check() disables it: cli treats GitHub
+# Actions as colour-capable, and an aborting check formats its message at throw
+# time, so the escapes would otherwise land in the comment.
+options(cli.num_colors = 1)
 
-  checked <- capture_check(
-    v,
-    verbose = env_lgl("VERBOSE"),
-    show_warnings = env_lgl("SHOW_WARNINGS")
+v <- tryCatch(validate(), error = identity)
+if (inherits(v, "error")) {
+  writeLines(render_exec_error(conditionMessage(v)), summary_path, useBytes = TRUE)
+  writeLines(conditionMessage(v), stderr())
+  fail(
+    "Submission validation could not be run. See the pull request comment, or the error above, for details."
   )
+}
 
-  writeLines(
-    render_summary(checked$lines, checked$failure),
-    summary_path,
-    useBytes = TRUE
+checked <- capture_check(
+  v,
+  verbose = env_lgl("VERBOSE"),
+  show_warnings = env_lgl("SHOW_WARNINGS")
+)
+
+writeLines(
+  render_summary(checked$lines, checked$failure),
+  summary_path,
+  useBytes = TRUE
+)
+
+# The console output was diverted, so replay it into the workflow log.
+writeLines(checked$lines, stderr())
+
+if (!is.null(checked$failure)) {
+  fail(
+    "Submission validation failed. See the pull request comment, or the check results above, for details."
   )
-
-  # The console output was diverted, so replay it into the workflow log.
-  writeLines(checked$lines, stderr())
-
-  if (!is.null(checked$failure)) {
-    fail(
-      "Submission validation failed. See the pull request comment, or the check results above, for details."
-    )
-  }
 }

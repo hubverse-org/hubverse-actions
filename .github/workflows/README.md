@@ -23,7 +23,8 @@ consumed by anyone.
 |---|---|
 | `test-pr-comment.yaml` | Self-tests [`pr-comment`](../../pr-comment) against the pull request it runs on. |
 | `test-validate-submission.yaml` | Runs [`validate-submission`](../../validate-submission) against fixture PRs in `ci-testhub-simple`, and its summary rendering against bundled test hubs. |
-| `test-submission-comment.yaml` | Exercises the upload-then-comment handoff, calling the same reusable workflow the template calls. |
+| `test-submission-comment.yaml` | Stage 1 of the handoff self-test: uploads a stub result. |
+| `test-submission-comment-post.yaml` | Stage 2: listens for the above finishing and calls the same shared workflow a hub calls. Split in two because a workflow cannot listen to itself. |
 
 If you add a reusable workflow here, add it to the first table. If you add CI,
 prefix it `test-` so the distinction keeps holding.

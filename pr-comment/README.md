@@ -82,6 +82,11 @@ artifact instead of the event context.
   HTML comment marker used to find the comment again. Anything else fails the
   step. `revision` is checked the same way, allowing `.` as well, since it goes
   into the marker too.
+- Only comments posted by a **bot** are ever adopted and updated. The marker is
+  predictable, so without that check someone could post a comment carrying it and
+  have the next run edit theirs instead. This means `token` must belong to a bot
+  or app identity; a personal access token posts a fresh comment every time
+  rather than updating its own.
 - Create-or-update is not atomic. Two runs with the same `header` racing on one
   PR can each create a comment, so callers that may fire concurrently should
   serialise with a workflow [`concurrency`](https://docs.github.com/actions/using-jobs/using-concurrency)

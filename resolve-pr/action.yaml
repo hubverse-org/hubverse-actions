@@ -6,11 +6,8 @@ description: >-
 author: "hubverse"
 
 inputs:
-  head_repository:
-    description: "Repository the run's head branch lives in, as owner/name."
-    default: ${{ github.event.workflow_run.head_repository.full_name }}
   head_owner:
-    description: "Owner of that repository."
+    description: "Owner of the repository the run's head branch lives in."
     default: ${{ github.event.workflow_run.head_repository.owner.login }}
   head_branch:
     description: "Head branch of the run."
@@ -35,24 +32,40 @@ runs:
     - id: resolve
       uses: actions/github-script@v7
       env:
-        HEAD_REPO: ${{ inputs.head_repository }}
         HEAD_OWNER: ${{ inputs.head_owner }}
         HEAD_BRANCH: ${{ inputs.head_branch }}
         HEAD_SHA: ${{ inputs.head_sha }}
       with:
         github-token: ${{ inputs.token }}
         script: |
+          const owner = process.env.HEAD_OWNER;
+          const branch = process.env.HEAD_BRANCH;
+          // Empty outside a workflow_run context, where the defaults resolve to
+          // nothing. Without this the filter becomes `head: ':'` and whatever
+          // comes back would be an arbitrary pull request.
+          if (!owner || !branch) {
+            core.setFailed('resolve-pr: no head repository or branch. Outside a `workflow_run` job, pass them explicitly.');
+            return;
+          }
+
           const prs = await github.paginate(github.rest.pulls.list, {
             ...context.repo,
             state: 'open',
-            head: `${process.env.HEAD_OWNER}:${process.env.HEAD_BRANCH}`,
+            head: `${owner}:${branch}`,
             per_page: 100,
           });
-          const pr = prs.find((p) => p.head.sha === process.env.HEAD_SHA) || prs[0];
+
+          // A branch can back more than one open pull request when they target
+          // different bases. Prefer the one at this commit; fall back to the only
+          // candidate when the branch has moved on since the run started, but
+          // never guess between several.
+          const pr = prs.find((p) => p.head.sha === process.env.HEAD_SHA) ||
+            (prs.length === 1 ? prs[0] : undefined);
           if (!pr) {
-            // Closed or merged between the run finishing and this running.
-            // Nothing to act on, and nothing wrong either.
-            core.info(`No open pull request for ${process.env.HEAD_REPO}:${process.env.HEAD_BRANCH}.`);
+            const why = prs.length > 1
+              ? `${prs.length} open pull requests share that branch and none is at ${process.env.HEAD_SHA}`
+              : 'it is closed or merged';
+            core.info(`No pull request resolved for ${owner}:${branch} — ${why}.`);
             core.setOutput('number', '');
             return;
           }

@@ -1,18 +1,16 @@
 name: Hub Submission Validation (R)
 
-# Two jobs, two triggers, one file.
+# Runs the checks on the pull request and saves the result. It cannot post that
+# result itself: most submissions come from forks, and a `pull_request` workflow
+# triggered from a fork gets a read-only GITHUB_TOKEN.
 #
-# `validate` runs on the pull request. It cannot post its own result: most
-# submissions come from forks, and a `pull_request` workflow triggered from a
-# fork gets a read-only GITHUB_TOKEN. It uploads the result instead.
+# The companion workflow posts it, running once this one finishes. Add both:
 #
-# `comment` then runs on this workflow finishing. That run belongs to your hub
-# rather than to the submitter, so it is allowed to comment, and it posts what
-# was uploaded. Its steps live in hubverse-actions rather than here, so that
-# fixes to them reach you without you having to add a new copy of this file.
+#   hubCI::use_hub_github_action("validate-submission")
+#   hubCI::use_hub_github_action("validate-submission-comment")
 #
-# The `workflows:` entry below must match this workflow's own `name:`. If you
-# change one, change the other, or results will silently stop being posted.
+# The companion matches this workflow by the `name:` above. If you change it,
+# change it there too, or results will quietly stop being posted.
 
 on:
   workflow_dispatch:
@@ -22,9 +20,6 @@ on:
       - 'model-output/**'
       - 'model-metadata/*'
       - '!**README**'
-  workflow_run:
-    workflows: ["Hub Submission Validation (R)"]
-    types: [completed]
 
 permissions:
   contents: read
@@ -32,7 +27,6 @@ permissions:
 
 jobs:
   validate:
-    if: github.event_name != 'workflow_run'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
@@ -48,11 +42,3 @@ jobs:
           # skip_submit_window_check: true
           # extra_packages: |
           #   any::mycustompkg
-
-  comment:
-    if: github.event_name == 'workflow_run'
-    uses: hubverse-org/hubverse-actions/.github/workflows/post-validation-comment.yaml@main
-    permissions:
-      contents: read
-      actions: read
-      pull-requests: write

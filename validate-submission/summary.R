@@ -77,8 +77,7 @@ truncate_lines <- function(lines, budget = BODY_BUDGET) {
 # length that content could match.
 fence <- function(lines) {
   runs <- unlist(regmatches(lines, gregexpr("`+", lines)))
-  longest <- if (length(runs) > 0L) max(nchar(runs)) else 0L
-  ticks <- strrep("`", max(4L, longest + 1L))
+  ticks <- strrep("`", max(4L, nchar(runs) + 1L))
   c(paste0(ticks, "text"), lines, ticks)
 }
 
@@ -114,10 +113,12 @@ render_summary <- function(lines, failure) {
 }
 
 # Reported when validation could not be run at all, so the pull request says so
-# rather than showing nothing but a failed check.
+# rather than showing nothing but a failed check. Split on newlines because
+# truncation works a line at a time: as one string an oversized message would cut
+# to nothing but the "lines omitted" notice.
 render_exec_error <- function(message) {
   summary_doc(
     ":x: **Validation could not be run.** This is usually a problem with the hub rather than the submission, so ask the hub administrators to take a look.",
-    message
+    strsplit(message, "\n", fixed = TRUE)[[1]]
   )
 }

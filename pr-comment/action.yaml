@@ -85,10 +85,13 @@ runs:
           // revision under identical headings. Say which one this is, since the
           // marker that distinguishes them is invisible. Commit SHAs are
           // abbreviated the way GitHub abbreviates them.
-          const label = /^[0-9a-f]{40}$/i.test(revision)
-            ? `commit \`${revision.slice(0, 7)}\``
-            : `revision \`${revision}\``;
-          const footer = revision ? `\n\n---\n<sub>Results for ${label}</sub>` : '';
+          let footer = '';
+          if (revision) {
+            const label = /^[0-9a-f]{40}$/i.test(revision)
+              ? `commit \`${revision.slice(0, 7)}\``
+              : `revision \`${revision}\``;
+            footer = `\n\n---\n<sub>Results for ${label}</sub>`;
+          }
           const body = `${marker}\n${raw}${footer}`;
 
           const issue_number = Number(process.env.PR);
@@ -102,7 +105,14 @@ runs:
             issue_number,
             per_page: 100,
           });
-          const existing = comments.find((c) => c.body && c.body.includes(marker));
+          // Only ever adopt a comment posted by a bot. The marker is predictable
+          // — the header is documented and the revision is the submitter's own
+          // commit — so a submitter could otherwise plant a comment carrying it
+          // and have the next run edit *their* comment, putting the result under
+          // their authorship for them to rewrite afterwards.
+          const existing = comments.find(
+            (c) => c.user && c.user.type === 'Bot' && c.body && c.body.includes(marker)
+          );
 
           let id;
           if (existing) {

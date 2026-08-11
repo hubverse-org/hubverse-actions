@@ -14,6 +14,7 @@ on:
   pull_request:
     paths:
       - 'validate-submission/**'
+      - '!**/README.md'
       - '.github/workflows/test-validate-submission.yaml'
 
 permissions:
@@ -22,8 +23,8 @@ permissions:
 
 jobs:
   # The rendering on its own, over the validation objects hubValidations bundles
-  # as test hubs. No hub checkout, no token, and it covers the shapes the fixture
-  # PRs above cannot produce, such as a hub whose config fails to load.
+  # as test hubs. No hub checkout and no token, so it covers rendering the fixture
+  # PRs cannot reach, such as oversized output and a run that never got started.
   summary:
     runs-on: ubuntu-22.04
     steps:
@@ -42,8 +43,9 @@ jobs:
         env:
           GITHUB_PAT: ${{ github.token }}
         with:
-          # Matched to the composite action's list so both restore from the same
-          # setup-r-dependencies cache entry, which is keyed on the resolved set.
+          # Matched to the composite action's list, so that once a branch has run
+          # once these jobs share one setup-r-dependencies cache entry rather than
+          # building two. The key is the resolved package set.
           packages: |
             any::hubValidations
             any::sessioninfo

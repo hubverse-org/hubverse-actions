@@ -38,7 +38,6 @@ Every input defaults to the right field of `github.event.workflow_run`, so a
 
 | Input | Default | Description |
 |---|---|---|
-| `head_repository` | run's head repo | Repository the head branch lives in, as `owner/name`. |
 | `head_owner` | run's head repo owner | Owner of that repository. |
 | `head_branch` | run's head branch | Head branch of the run. |
 | `head_sha` | run's head commit | Used to pick between pull requests sharing a branch name. |
@@ -50,6 +49,12 @@ Every input defaults to the right field of `github.event.workflow_run`, so a
 |---|---|
 | `number` | The pull request number, or **empty** if no open pull request matches. |
 
-An empty `number` is not an error: the pull request may have been closed or
-merged between the triggering run finishing and this one starting. Gate later
-steps on `steps.<id>.outputs.number != ''` rather than letting them fail.
+An empty `number` is not an error. The pull request may have been closed or
+merged between the triggering run finishing and this one starting, or the branch
+may back several open pull requests with none at this commit — the action will
+not guess between them. Gate later steps on `steps.<id>.outputs.number != ''`
+rather than letting them fail.
+
+Called outside a `workflow_run` job, where the defaults resolve to nothing, it
+fails rather than returning an arbitrary pull request. Pass the inputs
+explicitly if you need it elsewhere.
