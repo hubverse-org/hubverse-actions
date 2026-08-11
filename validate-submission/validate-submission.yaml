@@ -1,10 +1,18 @@
 name: Hub Submission Validation (R)
 
-# Posting the result back to the pull request needs a companion workflow, since
-# this one gets a read-only token on the fork pull requests most submissions come
-# from. Scaffold it with
-# hubCI::use_hub_github_action("validate-submission-comment"). Without it the
-# validation still runs and the summary is simply left as an artifact.
+# Two jobs, two triggers, one file.
+#
+# `validate` runs on the pull request. It cannot post its own result: most
+# submissions come from forks, and a `pull_request` workflow triggered from a
+# fork gets a read-only GITHUB_TOKEN. It uploads the result instead.
+#
+# `comment` then runs on this workflow finishing. That run belongs to your hub
+# rather than to the submitter, so it is allowed to comment, and it posts what
+# was uploaded. Its steps live in hubverse-actions rather than here, so that
+# fixes to them reach you without you having to add a new copy of this file.
+#
+# The `workflows:` entry below must match this workflow's own `name:`. If you
+# change one, change the other, or results will silently stop being posted.
 
 on:
   workflow_dispatch:
@@ -14,21 +22,26 @@ on:
       - 'model-output/**'
       - 'model-metadata/*'
       - '!**README**'
+  workflow_run:
+    workflows: ["Hub Submission Validation (R)"]
+    types: [completed]
 
 permissions:
   contents: read
   pull-requests: read
 
 jobs:
-  validate-submission:
+  validate:
+    if: github.event_name != 'workflow_run'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
 
       - uses: hubverse-org/hubverse-actions/validate-submission@main
         with:
-          # Where to write the markdown summary posted back to the pull request.
-          summary_path: ${{ runner.temp }}/validation/summary.md
+          # Report the result on the pull request. Set to false to keep the
+          # result in the workflow log only.
+          summary: true
           # Customise validation with further inputs, e.g. to skip the submission
           # window check or install extra packages for custom checks. See the
           # action README for the full list.
@@ -36,20 +49,10 @@ jobs:
           # extra_packages: |
           #   any::mycustompkg
 
-      - name: Record the pull request number
-        if: always() && github.event_name == 'pull_request'
-        shell: bash
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-          SUMMARY_DIR: ${{ runner.temp }}/validation
-        run: |
-          mkdir -p "$SUMMARY_DIR"
-          printf '%s' "$PR_NUMBER" > "$SUMMARY_DIR/pr-number.txt"
-
-      - name: Upload the validation summary
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v5
-        with:
-          name: submission-validation
-          path: ${{ runner.temp }}/validation
-          if-no-files-found: error
+  comment:
+    if: github.event_name == 'workflow_run'
+    uses: hubverse-org/hubverse-actions/.github/workflows/post-validation-comment.yaml@main
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write

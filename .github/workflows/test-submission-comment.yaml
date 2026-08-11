@@ -1,0 +1,105 @@
+name: Test submission comment flow
+
+# Mirrors what validate-submission's template does — a `pull_request` job that
+# uploads an artifact, and a `workflow_run` job triggered by this workflow's own
+# completion that posts it — but stubs the result instead of running a
+# validation. The posting job calls the same reusable workflow the template
+# calls, so this exercises the real thing rather than a copy of it.
+#
+# Two things to know when reading a run of this:
+#
+# - `workflow_run` only fires for workflow files already on the default branch,
+#   so on the pull request that changes this file only the `upload` job runs.
+#   The rest exercises whatever is on main.
+# - Each run is followed by another with every job skipped, because this workflow
+#   triggers on its own completion. GitHub caps `workflow_run` chains at three
+#   levels, so it stops there. That skipped run is the template's behaviour too.
+
+on:
+  pull_request:
+    paths:
+      - 'validate-submission/**'
+      - 'pr-comment/**'
+      - 'resolve-pr/**'
+      - '.github/workflows/post-validation-comment.yaml'
+      - '.github/workflows/test-submission-comment.yaml'
+  workflow_run:
+    workflows: ["Test submission comment flow"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Stand in for a validation summary
+        shell: bash
+        env:
+          RESULT_DIR: ${{ runner.temp }}/result
+        run: |
+          mkdir -p "$RESULT_DIR"
+          cat > "$RESULT_DIR/summary.md" <<'EOF'
+          ## Submission validation
+
+          comment-flow self-test: this comment is posted and removed by CI.
+          EOF
+
+      - name: Upload the stub summary
+        uses: actions/upload-artifact@v5
+        with:
+          name: comment-flow-selftest
+          path: ${{ runner.temp }}/result
+          if-no-files-found: error
+          retention-days: 1
+
+  comment:
+    if: github.event_name == 'workflow_run'
+    uses: ./.github/workflows/post-validation-comment.yaml
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+    with:
+      artifact_name: comment-flow-selftest
+      header: ci-comment-flow
+
+  verify:
+    if: github.event_name == 'workflow_run'
+    needs: comment
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - id: pr
+        uses: hubverse-org/hubverse-actions/resolve-pr@main
+
+      - name: Assert it landed on the right pull request, then clean up
+        if: steps.pr.outputs.number != ''
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        with:
+          script: |
+            const issue_number = Number(process.env.PR_NUMBER);
+            const marker = `<!-- hubverse-comment:ci-comment-flow:${process.env.HEAD_SHA} -->`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number,
+              per_page: 100,
+            });
+            const mine = comments.filter((c) => c.body && c.body.includes(marker));
+            if (mine.length !== 1) {
+              core.setFailed(`expected exactly 1 comment on PR ${issue_number}, found ${mine.length}`);
+              return;
+            }
+            if (!mine[0].body.includes('comment-flow self-test')) {
+              core.setFailed('the posted comment does not carry the stub summary');
+              return;
+            }
+            await github.rest.issues.deleteComment({ ...context.repo, comment_id: mine[0].id });
+            core.info(`comment flow self-test passed on PR ${issue_number}; test comment removed.`);

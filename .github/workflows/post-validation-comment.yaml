@@ -1,0 +1,84 @@
+name: Post a validation result to its pull request
+
+# Shipped to hubs, not this repository's own CI — see the README in this
+# directory for why the two sit side by side.
+#
+# Reusable half of the fork-safe commenting pattern. A `pull_request` workflow
+# triggered from a fork gets a read-only GITHUB_TOKEN and cannot comment, so it
+# uploads its result as an artifact and a `workflow_run` job calls this, which
+# runs in the base repository's context with a write token.
+#
+# Called like this, from a workflow that triggers on its own completion:
+#
+#   comment:
+#     if: github.event_name == 'workflow_run'
+#     uses: hubverse-org/hubverse-actions/.github/workflows/post-validation-comment.yaml@main
+#     permissions:
+#       contents: read
+#       actions: read
+#       pull-requests: write
+#
+# Everything below is referenced at @main rather than copied into a hub, so gate
+# expressions, action pins and the concurrency key stay fixable in one place.
+
+on:
+  workflow_call:
+    inputs:
+      artifact_name:
+        description: >-
+          Artifact the triggering run uploaded the result as. Must match the
+          `artifact_name` the producing action uploaded it under.
+        type: string
+        default: submission-validation-results
+      body_file:
+        description: "File within that artifact holding the comment body."
+        type: string
+        default: summary.md
+      header:
+        description: "pr-comment key; each header owns one sticky comment per revision."
+        type: string
+        default: submission-validation
+
+jobs:
+  comment:
+    # Skipped on the workflow_run that the calling run triggers in turn, which is
+    # where the chain stops.
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      contains(fromJSON('["success", "failure"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-22.04
+    # Serialise re-runs of one revision: pr-comment's create-or-update is not
+    # atomic, so two of them finishing together could each post a comment. Keyed
+    # on the commit rather than the branch because runs for different revisions
+    # write different comments and never race — and because a group holds only
+    # one pending run, so a branch-wide key would cancel a middle commit's
+    # comment before it posted.
+    concurrency:
+      group: ${{ inputs.header }}-${{ github.event.workflow_run.head_sha }}
+      cancel-in-progress: false
+    steps:
+      - name: Download the result
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: result
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      # A fork pull request runs its own copy of the triggering workflow, so
+      # everything in the artifact is submitter-controlled. The target pull
+      # request is therefore resolved from the trigger, never from the artifact.
+      # Empty when the pull request has since been closed.
+      - name: Resolve the pull request from the trigger
+        id: pr
+        uses: hubverse-org/hubverse-actions/resolve-pr@main
+
+      - if: steps.pr.outputs.number != ''
+        uses: hubverse-org/hubverse-actions/pr-comment@main
+        with:
+          pr: ${{ steps.pr.outputs.number }}
+          header: ${{ inputs.header }}
+          # Keying on the submitted commit posts a fresh comment per revision,
+          # which notifies the submitter, and keeps earlier results on the thread.
+          revision: ${{ github.event.workflow_run.head_sha }}
+          body_path: result/${{ inputs.body_file }}

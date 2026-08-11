@@ -1,0 +1,59 @@
+name: "Resolve the pull request behind a workflow_run"
+description: >-
+  Find the pull request a completed workflow run came from, using only the
+  trigger payload, so a job acting on that run's artifacts cannot be pointed at
+  another pull request.
+author: "hubverse"
+
+inputs:
+  head_repository:
+    description: "Repository the run's head branch lives in, as owner/name."
+    default: ${{ github.event.workflow_run.head_repository.full_name }}
+  head_owner:
+    description: "Owner of that repository."
+    default: ${{ github.event.workflow_run.head_repository.owner.login }}
+  head_branch:
+    description: "Head branch of the run."
+    default: ${{ github.event.workflow_run.head_branch }}
+  head_sha:
+    description: "Head commit of the run, used to pick between branches reused across pull requests."
+    default: ${{ github.event.workflow_run.head_sha }}
+  token:
+    description: "Token used to look the pull request up."
+    default: ${{ github.token }}
+
+outputs:
+  number:
+    description: >-
+      The pull request number, or empty if there is no longer an open pull
+      request for that branch. Gate later steps on this being non-empty.
+    value: ${{ steps.resolve.outputs.number }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      uses: actions/github-script@v7
+      env:
+        HEAD_REPO: ${{ inputs.head_repository }}
+        HEAD_OWNER: ${{ inputs.head_owner }}
+        HEAD_BRANCH: ${{ inputs.head_branch }}
+        HEAD_SHA: ${{ inputs.head_sha }}
+      with:
+        github-token: ${{ inputs.token }}
+        script: |
+          const prs = await github.paginate(github.rest.pulls.list, {
+            ...context.repo,
+            state: 'open',
+            head: `${process.env.HEAD_OWNER}:${process.env.HEAD_BRANCH}`,
+            per_page: 100,
+          });
+          const pr = prs.find((p) => p.head.sha === process.env.HEAD_SHA) || prs[0];
+          if (!pr) {
+            // Closed or merged between the run finishing and this running.
+            // Nothing to act on, and nothing wrong either.
+            core.info(`No open pull request for ${process.env.HEAD_REPO}:${process.env.HEAD_BRANCH}.`);
+            core.setOutput('number', '');
+            return;
+          }
+          core.setOutput('number', pr.number);
