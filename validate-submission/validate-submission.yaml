@@ -1,5 +1,11 @@
 name: Hub Submission Validation (R)
 
+# Posting the result back to the pull request needs a companion workflow, since
+# this one gets a read-only token on the fork pull requests most submissions come
+# from. Scaffold it with
+# hubCI::use_hub_github_action("validate-submission-comment"). Without it the
+# validation still runs and the summary is simply left as an artifact.
+
 on:
   workflow_dispatch:
   pull_request:
@@ -20,10 +26,30 @@ jobs:
       - uses: actions/checkout@v7
 
       - uses: hubverse-org/hubverse-actions/validate-submission@main
-        # Customise validation via inputs, e.g. to skip the submission window
-        # check or install extra packages for custom checks. See the action
-        # README for the full list.
-        # with:
-        #   skip_submit_window_check: true
-        #   extra_packages: |
-        #     any::mycustompkg
+        with:
+          # Where to write the markdown summary posted back to the pull request.
+          summary_path: ${{ runner.temp }}/validation/summary.md
+          # Customise validation with further inputs, e.g. to skip the submission
+          # window check or install extra packages for custom checks. See the
+          # action README for the full list.
+          # skip_submit_window_check: true
+          # extra_packages: |
+          #   any::mycustompkg
+
+      - name: Record the pull request number
+        if: always() && github.event_name == 'pull_request'
+        shell: bash
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          SUMMARY_DIR: ${{ runner.temp }}/validation
+        run: |
+          mkdir -p "$SUMMARY_DIR"
+          printf '%s' "$PR_NUMBER" > "$SUMMARY_DIR/pr-number.txt"
+
+      - name: Upload the validation summary
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v5
+        with:
+          name: submission-validation
+          path: ${{ runner.temp }}/validation
+          if-no-files-found: error

@@ -54,6 +54,13 @@ inputs:
   show_warnings:
     description: "Print check-level warnings inline with their checks (true/false)."
     default: "false"
+  summary_path:
+    description: >-
+      Path to write a markdown summary of the check results to, for posting back
+      to the pull request. Empty writes no summary. Setting it also diverts the
+      check results through the file, so the workflow log shows them without
+      colour.
+    default: ""
   # environment / setup
   extra_packages:
     description: >-
@@ -106,4 +113,5 @@ runs:
         DERIVED_TASK_IDS: ${{ inputs.derived_task_ids }}
         VERBOSE: ${{ inputs.verbose }}
         SHOW_WARNINGS: ${{ inputs.show_warnings }}
+        SUMMARY_PATH: ${{ inputs.summary_path }}
       run: Rscript "${GITHUB_ACTION_PATH}/validate.R"

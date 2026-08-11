@@ -56,6 +56,12 @@ the revision changes — which notifies — while a re-run on the **same** revis
 edits that revision's comment in place. Earlier revisions' comments are left
 untouched, so the PR accumulates a history of results across commits.
 
+Because those comments share a heading, each one gains a footer saying which
+revision it is for (`Results for commit \`a1b2c3d\``, with 40-character SHAs
+abbreviated). Timeline position usually implies it, but not when pushes land
+faster than runs finish, when GitHub groups several commits into one entry, or
+when the comment is read from a notification.
+
 ```yaml
 - uses: hubverse-org/hubverse-actions/pr-comment@main
   with:
@@ -74,7 +80,8 @@ artifact instead of the event context.
 
 - `header` must be a slug of letters, digits, `-` or `_`; it is embedded in an
   HTML comment marker used to find the comment again. Anything else fails the
-  step.
+  step. `revision` is checked the same way, allowing `.` as well, since it goes
+  into the marker too.
 - Create-or-update is not atomic. Two runs with the same `header` racing on one
   PR can each create a comment, so callers that may fire concurrently should
   serialise with a workflow [`concurrency`](https://docs.github.com/actions/using-jobs/using-concurrency)

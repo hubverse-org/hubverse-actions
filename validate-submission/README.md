@@ -47,9 +47,30 @@ default to the workflow context, so the turnkey case needs no inputs at all.
 | `derived_task_ids` | *(empty)* | Comma-separated task IDs derived from other task IDs. |
 | `verbose` | `true` | Print the result of every check before the summary. |
 | `show_warnings` | `false` | Print check-level warnings inline. |
+| `summary_path` | *(empty)* | Path to write a markdown summary of the check results to. See [Posting the result to the pull request](#posting-the-result-to-the-pull-request). |
 | `extra_packages` | *(empty)* | Extra R packages to install (`setup-r-dependencies` syntax). |
 | `extra_repositories` | hubverse r-universe | Extra R package repositories. |
 | `github_token` | `${{ github.token }}` | Token used to read PR files via the GitHub API. |
+
+## Posting the result to the pull request
+
+Set `summary_path` and the action writes a markdown summary of the check results
+there, ready to post as a pull request comment. The template workflow uploads it
+as an artifact, and the companion
+[`validate-submission-comment`](../validate-submission-comment) workflow posts it.
+Both templates are needed:
+
+```r
+hubCI::use_hub_github_action("validate-submission")
+hubCI::use_hub_github_action("validate-submission-comment")
+```
+
+The split exists because a `pull_request` workflow triggered from a fork gets a
+read-only token and cannot comment. See the companion README for the detail.
+
+Setting `summary_path` also routes the check results through the summary file
+before they reach the workflow log, which drops the colour they would otherwise
+be printed in. The log content is unchanged.
 
 For more on configuring validation checks, see the `hubValidations` vignette on
 [Validating Pull Requests on GitHub](https://hubverse-org.github.io/hubValidations/articles/validate-pr.html).

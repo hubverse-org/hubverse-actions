@@ -72,6 +72,10 @@ jobs:
               core.setFailed('sticky comment was not updated in place');
               return;
             }
+            if (mine[0].body.includes('Results for')) {
+              core.setFailed('a comment posted without a revision should carry no revision footer');
+              return;
+            }
             await github.rest.issues.deleteComment({ ...context.repo, comment_id: mine[0].id });
             core.info('sticky self-test passed; test comment removed.');
 
@@ -108,12 +112,23 @@ jobs:
           revision: rev-b
           body: "revision self-test: B."
 
+      # Production always passes a commit SHA, so cover the abbreviated form too.
+      - name: Post at a revision that is a commit SHA
+        id: c
+        uses: ./pr-comment
+        with:
+          pr: ${{ github.event.number }}
+          header: ci-selftest-revision
+          revision: 0123456789abcdef0123456789abcdef01234567
+          body: "revision self-test: C."
+
       - name: Assert same-revision edits in place, new revision adds a comment
         uses: actions/github-script@v7
         env:
           ID_A: ${{ steps.a.outputs.comment-id }}
           ID_A2: ${{ steps.a2.outputs.comment-id }}
           ID_B: ${{ steps.b.outputs.comment-id }}
+          ID_C: ${{ steps.c.outputs.comment-id }}
         with:
           script: |
             if (process.env.ID_A2 !== process.env.ID_A) {
@@ -131,13 +146,14 @@ jobs:
               per_page: 100,
             });
             const mine = comments.filter((c) => c.body && c.body.includes(prefix));
-            if (mine.length !== 2) {
-              core.setFailed(`expected 2 comments (one per revision), found ${mine.length}`);
+            if (mine.length !== 3) {
+              core.setFailed(`expected 3 comments (one per revision), found ${mine.length}`);
               return;
             }
             const byId = Object.fromEntries(mine.map((c) => [String(c.id), c]));
             const a = byId[process.env.ID_A];
             const b = byId[process.env.ID_B];
+            const c = byId[process.env.ID_C];
             if (!a || !a.body.includes('revision self-test: A updated')) {
               core.setFailed('revision A comment missing or not updated in place');
               return;
@@ -146,13 +162,23 @@ jobs:
               core.setFailed('revision B comment missing or has wrong content');
               return;
             }
+            // Each comment says which revision it is for, since the marker that
+            // tells them apart is invisible.
+            if (!a.body.includes('Results for revision `rev-a`')) {
+              core.setFailed('revision A comment is missing its revision footer');
+              return;
+            }
+            if (!c || !c.body.includes('Results for commit `0123456`')) {
+              core.setFailed('a SHA revision should be abbreviated in the footer');
+              return;
+            }
             for (const c of mine) {
               await github.rest.issues.deleteComment({ ...context.repo, comment_id: c.id });
             }
             core.info('revision self-test passed; test comments removed.');
 
-  invalid-header:
-    # The header guard runs before any API call, so no comment is posted and this
+  invalid-inputs:
+    # The input guards run before any API call, so no comment is posted and this
     # job works on fork PRs too, where the read-only token blocks the jobs above.
     runs-on: ubuntu-22.04
     steps:
@@ -175,11 +201,24 @@ jobs:
           header: "ci-selftest:not-a-slug"
           body: "invalid-header self-test: must never be posted."
 
-      - name: Assert both were rejected
+      # A revision carrying `-->` would close the marker early and spill the rest
+      # of the comment into the rendered body.
+      - name: Revision that would break out of the marker
+        id: revision
+        continue-on-error: true
+        uses: ./pr-comment
+        with:
+          pr: ${{ github.event.number }}
+          header: ci-selftest-bad-revision
+          revision: "abc --> <script>"
+          body: "invalid-input self-test: must never be posted."
+
+      - name: Assert all were rejected
         shell: bash
         env:
           OMITTED: ${{ steps.omitted.outcome }}
           COLON: ${{ steps.colon.outcome }}
+          REVISION: ${{ steps.revision.outcome }}
         run: |
           status=0
           if [ "$OMITTED" != failure ]; then
@@ -188,6 +227,10 @@ jobs:
           fi
           if [ "$COLON" != failure ]; then
             echo "a header containing ':' should fail the step, got: $COLON"
+            status=1
+          fi
+          if [ "$REVISION" != failure ]; then
+            echo "a revision containing '-->' should fail the step, got: $REVISION"
             status=1
           fi
           exit "$status"
