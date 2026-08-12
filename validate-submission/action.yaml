@@ -170,5 +170,8 @@ runs:
         name: ${{ inputs.artifact_name }}
         path: ${{ steps.paths.outputs.dir }}
         if-no-files-found: error
+        # Re-runs share the workflow run, and v4+ artifacts are immutable, so
+        # without this the upload 409s on every re-run attempt.
+        overwrite: true
         # Read by the companion workflow moments later, then dead.
         retention-days: 1

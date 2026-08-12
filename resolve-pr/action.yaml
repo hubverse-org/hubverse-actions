@@ -40,11 +40,20 @@ runs:
         script: |
           const owner = process.env.HEAD_OWNER;
           const branch = process.env.HEAD_BRANCH;
-          // Empty outside a workflow_run context, where the defaults resolve to
-          // nothing. Without this the filter becomes `head: ':'` and whatever
-          // comes back would be an arbitrary pull request.
-          if (!owner || !branch) {
+          // Nothing at all means this ran outside a workflow_run job, where the
+          // defaults resolve to nothing. That is a wiring mistake, and without
+          // the guard the filter becomes `head: ':'` and returns an arbitrary
+          // pull request.
+          if (!owner && !branch) {
             core.setFailed('resolve-pr: no head repository or branch. Outside a `workflow_run` job, pass them explicitly.');
+            return;
+          }
+          // Half a reference means the fork was deleted while the pull request
+          // was open. Nothing to act on, and nothing wrong — but never build a
+          // half-empty `head:` filter out of it.
+          if (!owner || !branch) {
+            core.info(`Incomplete head reference (${owner || '?'}:${branch || '?'}); the fork was probably deleted.`);
+            core.setOutput('number', '');
             return;
           }
 

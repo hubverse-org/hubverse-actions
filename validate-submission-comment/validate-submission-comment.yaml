@@ -24,6 +24,11 @@ permissions:
 
 jobs:
   comment:
+    # Skipped on forks of the hub, matching the validation workflow. Stated here
+    # rather than relying on that workflow being skipped, because a run whose
+    # only job was skipped does not reliably report a conclusion this one treats
+    # as "nothing to do".
+    if: github.event.repository.fork != true
     uses: hubverse-org/hubverse-actions/.github/workflows/post-validation-comment.yaml@main
     permissions:
       contents: read

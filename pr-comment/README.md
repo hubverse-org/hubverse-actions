@@ -82,11 +82,12 @@ artifact instead of the event context.
   HTML comment marker used to find the comment again. Anything else fails the
   step. `revision` is checked the same way, allowing `.` as well, since it goes
   into the marker too.
-- Only comments posted by a **bot** are ever adopted and updated. The marker is
-  predictable, so without that check someone could post a comment carrying it and
-  have the next run edit theirs instead. This means `token` must belong to a bot
-  or app identity; a personal access token posts a fresh comment every time
-  rather than updating its own.
+- A comment is only adopted if a **bot** posted it *and* the marker is the first
+  thing in it, which is where this action puts it. The marker is predictable, so
+  without both checks someone could post a comment carrying it, or bury one
+  revision's marker inside another's, and have the next run edit the wrong
+  comment. This means `token` must belong to a bot or app identity; a personal
+  access token posts a fresh comment every time rather than updating its own.
 - Create-or-update is not atomic. Two runs with the same `header` racing on one
   PR can each create a comment, so callers that may fire concurrently should
   serialise with a workflow [`concurrency`](https://docs.github.com/actions/using-jobs/using-concurrency)
@@ -103,7 +104,8 @@ context with a write token.
 The recommended pattern is a two-stage
 [`workflow_run`](https://docs.github.com/actions/using-workflows/events-that-trigger-workflows#workflow_run)
 split: the `pull_request` workflow does the read-only work and uploads its result
-(plus the PR number) as an artifact; a `workflow_run` workflow downloads the
-artifact and calls this action to post. Avoid `pull_request_target` for anything
-that checks out or acts on PR content — it exposes the write token to
-submitter-controlled code.
+as an artifact; a `workflow_run` workflow downloads it and calls this action to
+post. Work out which pull request to post to from the trigger — that is what
+[`resolve-pr`](../resolve-pr) is for — and never from the artifact, which a fork
+controls. Avoid `pull_request_target` for anything that checks out or acts on
+pull request content: it exposes the write token to submitter-controlled code.

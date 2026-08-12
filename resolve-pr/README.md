@@ -49,12 +49,12 @@ Every input defaults to the right field of `github.event.workflow_run`, so a
 |---|---|
 | `number` | The pull request number, or **empty** if no open pull request matches. |
 
-An empty `number` is not an error. The pull request may have been closed or
-merged between the triggering run finishing and this one starting, or the branch
-may back several open pull requests with none at this commit — the action will
-not guess between them. Gate later steps on `steps.<id>.outputs.number != ''`
-rather than letting them fail.
+An empty `number` is not an error, so gate later steps on
+`steps.<id>.outputs.number != ''` rather than letting them fail. It means one of:
+the pull request was closed or merged while the first run was finishing; the fork
+it came from was deleted; or the branch backs several open pull requests and none
+is at this commit, in which case the action will not guess between them.
 
-Called outside a `workflow_run` job, where the defaults resolve to nothing, it
-fails rather than returning an arbitrary pull request. Pass the inputs
+It fails only when given nothing at all to work with, which happens outside a
+`workflow_run` job, where the defaults resolve to nothing. Pass the inputs
 explicitly if you need it elsewhere.

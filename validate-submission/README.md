@@ -54,7 +54,7 @@ flowchart TB
     A["Submission pull request<br/>(usually from a fork)"]
 
     subgraph s1["Stage 1 · runs on the pull request · read-only"]
-        B["validate job"]
+        B["validation workflow"]
         C["validate-submission action<br/>runs the checks, writes up the result"]
         D[("result file,<br/>saved to the run")]
         B --> C --> D
@@ -89,7 +89,7 @@ They have to be two separate files: GitHub rejects a workflow that names itself
 as its own trigger, with `Workflow '...' cannot listen to itself`.
 
 The saved file is not trusted either. A submission from a fork runs its own copy
-of the `validate` job, so it controls what ends up in that file. This is why
+of Stage 1, so it controls what ends up in that file. This is why
 Stage 2 works out which pull request to comment on from GitHub's own record of
 what triggered it, rather than from anything Stage 1 produced. Otherwise a
 submission could have your hub post onto someone else's pull request (this is
@@ -104,6 +104,13 @@ you have added it, nothing we change afterwards reaches it. So it holds only the
 parts you might genuinely want to adjust, and the machinery behind them stays on
 our side, where you pick up fixes automatically instead of having to add a fresh
 copy of the file every time something changes.
+
+Neither workflow runs on a **fork of your hub**. A submitter working in their own
+fork would otherwise see checks run, and sometimes fail, against their copy —
+which tells them nothing, since the validation that decides whether their
+submission is accepted is the one that runs on their pull request here. Delete
+the `if:` line from either workflow if your hub wants forks to validate
+themselves.
 
 Stage 2 finds Stage 1 **by the workflow's name**. If you rename this workflow,
 change the `workflows:` list in `validate-submission-comment.yaml` to match, or

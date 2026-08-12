@@ -24,6 +24,9 @@ That second run has to be a **separate workflow file**: GitHub rejects a workflo
 that names itself as its own trigger, with `Workflow '...' cannot listen to
 itself`.
 
+Like the validation workflow, it does not run on forks of your hub — a submitter
+should see results on their pull request here, not in their own copy.
+
 ## Keeping the two in step
 
 The trigger matches the validation workflow by name:

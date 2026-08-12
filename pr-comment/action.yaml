@@ -105,13 +105,14 @@ runs:
             issue_number,
             per_page: 100,
           });
-          // Only ever adopt a comment posted by a bot. The marker is predictable
-          // — the header is documented and the revision is the submitter's own
-          // commit — so a submitter could otherwise plant a comment carrying it
-          // and have the next run edit *their* comment, putting the result under
-          // their authorship for them to rewrite afterwards.
+          // Only ever adopt a comment posted by a bot, and only one whose marker
+          // is where this action puts it. The marker is predictable — the header
+          // is documented and the revision is the submitter's own commit — so a
+          // submitter could otherwise plant one and have the next run edit their
+          // comment, or bury another revision's marker in a body they control
+          // and have that revision's comment adopted instead.
           const existing = comments.find(
-            (c) => c.user && c.user.type === 'Bot' && c.body && c.body.includes(marker)
+            (c) => c.user && c.user.type === 'Bot' && c.body && c.body.startsWith(marker)
           );
 
           let id;
