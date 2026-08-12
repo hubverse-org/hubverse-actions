@@ -3,7 +3,8 @@
 Creates or updates a **single** pull request comment identified by a marker key.
 Each distinct `header` keeps its own sticky comment on a PR, so re-running a
 workflow updates its comment in place and independent workflows never clobber
-each other's.
+each other's. Used by the [submission validation
+flow](../validate-submission/README.md#how-it-works).
 
 It wraps [`actions/github-script`](https://github.com/actions/github-script) —
 no external dependencies — and embeds a hidden marker

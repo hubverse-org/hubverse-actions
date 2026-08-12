@@ -1,7 +1,8 @@
 # resolve-pr
 
 Finds the pull request behind a completed workflow run, for a `workflow_run` job
-that needs to act on that run's result.
+that needs to act on that run's result. Used by the [submission validation
+flow](../validate-submission/README.md#how-it-works).
 
 ```yaml
 - id: pr

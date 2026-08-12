@@ -144,6 +144,35 @@ expect(
   "truncation keeps the end, where the failing checks are"
 )
 
+# A line longer than the whole budget fits nowhere, so without a cut into it the
+# tail would be dropped and the summary would be the notice and nothing else.
+one_big_line <- render_summary(
+  c("an earlier line", paste0(strrep("z", 60000L), "the failing detail")),
+  "failed"
+)
+
+expect(
+  sum(nchar(one_big_line)) + length(one_big_line) < 65536L,
+  "a single oversized line is brought under the comment limit"
+)
+expect(
+  any(grepl("zzzz", one_big_line, fixed = TRUE)),
+  "a single oversized line still shows some of its content"
+)
+expect(
+  any(grepl("rest of line omitted", one_big_line, fixed = TRUE)),
+  "cutting into a line says so"
+)
+
+# The budget is in bytes, so a multibyte line has to be cut on a character
+# boundary to stay valid UTF-8 and inside the budget.
+multibyte <- truncate_lines(strrep("é", 40000L))
+expect(
+  sum(nchar(multibyte, type = "bytes")) <= BODY_BUDGET &&
+    !any(is.na(nchar(multibyte))),
+  "a multibyte line is cut on a character boundary, within the byte budget"
+)
+
 # --- validation that could not run --------------------------------------------
 
 exec <- render_exec_error("Error: hub-config/tasks.json is not valid JSON.")

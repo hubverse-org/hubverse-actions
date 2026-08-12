@@ -54,6 +54,15 @@ capture_check <- function(v, verbose = TRUE, show_warnings = FALSE) {
   )
 }
 
+CUT_NOTE <- " [... rest of line omitted ...]"
+
+# Cut to a byte budget, but on a character boundary so the result is still valid
+# UTF-8.
+cut_line <- function(line, budget) {
+  widths <- nchar(strsplit(line, "")[[1]], type = "bytes")
+  paste0(substr(line, 1L, sum(cumsum(widths) <= budget)), CUT_NOTE)
+}
+
 # Keeps the tail, because check_for_errors() prints the failing checks last.
 truncate_lines <- function(lines, budget = BODY_BUDGET) {
   sizes <- nchar(lines, type = "bytes") + 1L
@@ -61,12 +70,23 @@ truncate_lines <- function(lines, budget = BODY_BUDGET) {
     return(lines)
   }
   keep <- rev(cumsum(rev(sizes)) <= budget)
-  c(
-    sprintf(
-      "[... %d earlier lines omitted, see the workflow log for the full output ...]",
-      sum(!keep)
-    ),
+  kept <- if (any(keep)) {
     lines[keep]
+  } else {
+    # A line longer than the whole budget fits nowhere, which would drop the tail
+    # this function exists to keep and leave the notice on its own. Cut into that
+    # line instead, so some of the failing detail survives.
+    cut_line(lines[length(lines)], budget - nchar(CUT_NOTE, type = "bytes") - 1L)
+  }
+  omitted <- length(lines) - length(kept)
+  c(
+    if (omitted > 0L) {
+      sprintf(
+        "[... %d earlier lines omitted, see the workflow log for the full output ...]",
+        omitted
+      )
+    },
+    kept
   )
 }
 
