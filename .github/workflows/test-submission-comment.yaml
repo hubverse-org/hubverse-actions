@@ -1,0 +1,51 @@
+name: Test submission comment flow
+
+# Stage 1 of the self-test: stands in for a validation run by uploading a stub
+# result. Stage 2 lives in test-submission-comment-post.yaml, which listens for
+# this workflow completing — a workflow cannot listen to itself, which is the
+# same reason hubs need two files.
+#
+# On the pull request that changes these files only this half runs: `workflow_run`
+# fires only for workflow files already on the default branch.
+
+on:
+  pull_request:
+    paths:
+      - 'validate-submission/**'
+      - 'validate-submission-comment/**'
+      - 'pr-comment/**'
+      - 'resolve-pr/**'
+      - '!**/README.md'
+      - '.github/workflows/post-validation-comment.yaml'
+      - '.github/workflows/test-submission-comment.yaml'
+      - '.github/workflows/test-submission-comment-post.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Stand in for a validation summary
+        shell: bash
+        env:
+          RESULT_DIR: ${{ runner.temp }}/result
+        run: |
+          mkdir -p "$RESULT_DIR"
+          cat > "$RESULT_DIR/summary.md" <<'EOF'
+          ## Submission validation
+
+          comment-flow self-test: this comment is posted and removed by CI.
+          EOF
+
+      - name: Upload the stub summary
+        uses: actions/upload-artifact@v5
+        with:
+          name: comment-flow-selftest
+          path: ${{ runner.temp }}/result
+          if-no-files-found: error
+          # Re-runs share the workflow run, and v4+ artifacts are immutable, so
+          # without this the upload 409s on every re-run attempt.
+          overwrite: true
+          retention-days: 1

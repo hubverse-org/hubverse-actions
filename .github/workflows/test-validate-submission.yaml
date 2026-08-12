@@ -2,13 +2,19 @@ name: Test validate-submission action
 
 # Exercises the validate-submission composite action (referenced locally) against
 # the standing fixture PRs in hubverse-org/ci-testhub-simple, asserting each
-# produces its expected pass/fail outcome.
+# produces its expected pass/fail outcome and the matching pull request summary.
+# A separate job covers the summary rendering on its own, without a hub.
+#
+# What no job here reaches is the posting half: the artifact handoff and the
+# workflow_run comment only run against a hub that has the template installed on
+# its default branch, with the submission arriving from a fork.
 
 on:
   workflow_dispatch:
   pull_request:
     paths:
       - 'validate-submission/**'
+      - '!**/README.md'
       - '.github/workflows/test-validate-submission.yaml'
 
 permissions:
@@ -16,6 +22,37 @@ permissions:
   pull-requests: read
 
 jobs:
+  # The rendering on its own, over the validation objects hubValidations bundles
+  # as test hubs. No hub checkout and no token, so it covers rendering the fixture
+  # PRs cannot reach, such as oversized output and a run that never got started.
+  summary:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          install-r: false
+          use-public-rspm: true
+          extra-repositories: 'https://hubverse-org.r-universe.dev'
+
+      - name: Update apt
+        run: sudo apt-get update
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        env:
+          GITHUB_PAT: ${{ github.token }}
+        with:
+          # Matched to the composite action's list, so that once a branch has run
+          # once these jobs share one setup-r-dependencies cache entry rather than
+          # building two. The key is the resolved package set.
+          packages: |
+            any::hubValidations
+            any::sessioninfo
+
+      - name: Run the summary tests
+        run: Rscript validate-submission/tests/test-summary.R
+
   test:
     runs-on: ubuntu-22.04
     strategy:
@@ -49,6 +86,8 @@ jobs:
           # skip the only wall-clock-relative check so the assertion tests the
           # submission content, not the current date.
           skip_submit_window_check: true
+          summary: true
+          artifact_name: fixture-pr-${{ matrix.pr }}
 
       - name: Assert outcome is ${{ matrix.expect }}
         run: |
@@ -57,3 +96,27 @@ jobs:
             exit 1
           fi
           echo "PR ${{ matrix.pr }}: outcome '${{ steps.validate.outcome }}' as expected"
+
+      - name: Assert the pull request summary matches
+        env:
+          # Taken from the action's output, so the test cannot drift from where
+          # the action actually writes.
+          SUMMARY: ${{ steps.validate.outputs.summary-path }}
+          EXPECT: ${{ matrix.expect }}
+          PR: ${{ matrix.pr }}
+        run: |
+          if [ ! -s "$SUMMARY" ]; then
+            echo "::error::PR $PR: no summary written to $SUMMARY"
+            exit 1
+          fi
+          echo "PR $PR summary:"
+          cat "$SUMMARY"
+          if [ "$EXPECT" = success ]; then
+            marker=':white_check_mark:'
+          else
+            marker=':x:'
+          fi
+          if ! grep -qF "$marker" "$SUMMARY"; then
+            echo "::error::PR $PR: summary does not carry $marker"
+            exit 1
+          fi

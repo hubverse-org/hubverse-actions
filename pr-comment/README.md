@@ -3,7 +3,8 @@
 Creates or updates a **single** pull request comment identified by a marker key.
 Each distinct `header` keeps its own sticky comment on a PR, so re-running a
 workflow updates its comment in place and independent workflows never clobber
-each other's.
+each other's. Used by the [submission validation
+flow](../validate-submission/README.md#how-it-works).
 
 It wraps [`actions/github-script`](https://github.com/actions/github-script) —
 no external dependencies — and embeds a hidden marker
@@ -56,6 +57,12 @@ the revision changes — which notifies — while a re-run on the **same** revis
 edits that revision's comment in place. Earlier revisions' comments are left
 untouched, so the PR accumulates a history of results across commits.
 
+Because those comments share a heading, each one gains a footer saying which
+revision it is for (`Results for commit \`a1b2c3d\``, with 40-character SHAs
+abbreviated). Timeline position usually implies it, but not when pushes land
+faster than runs finish, when GitHub groups several commits into one entry, or
+when the comment is read from a notification.
+
 ```yaml
 - uses: hubverse-org/hubverse-actions/pr-comment@main
   with:
@@ -74,7 +81,14 @@ artifact instead of the event context.
 
 - `header` must be a slug of letters, digits, `-` or `_`; it is embedded in an
   HTML comment marker used to find the comment again. Anything else fails the
-  step.
+  step. `revision` is checked the same way, allowing `.` as well, since it goes
+  into the marker too.
+- A comment is only adopted if a **bot** posted it *and* the marker is the first
+  thing in it, which is where this action puts it. The marker is predictable, so
+  without both checks someone could post a comment carrying it, or bury one
+  revision's marker inside another's, and have the next run edit the wrong
+  comment. This means `token` must belong to a bot or app identity; a personal
+  access token posts a fresh comment every time rather than updating its own.
 - Create-or-update is not atomic. Two runs with the same `header` racing on one
   PR can each create a comment, so callers that may fire concurrently should
   serialise with a workflow [`concurrency`](https://docs.github.com/actions/using-jobs/using-concurrency)
@@ -91,7 +105,8 @@ context with a write token.
 The recommended pattern is a two-stage
 [`workflow_run`](https://docs.github.com/actions/using-workflows/events-that-trigger-workflows#workflow_run)
 split: the `pull_request` workflow does the read-only work and uploads its result
-(plus the PR number) as an artifact; a `workflow_run` workflow downloads the
-artifact and calls this action to post. Avoid `pull_request_target` for anything
-that checks out or acts on PR content — it exposes the write token to
-submitter-controlled code.
+as an artifact; a `workflow_run` workflow downloads it and calls this action to
+post. Work out which pull request to post to from the trigger — that is what
+[`resolve-pr`](../resolve-pr) is for — and never from the artifact, which a fork
+controls. Avoid `pull_request_target` for anything that checks out or acts on
+pull request content: it exposes the write token to submitter-controlled code.

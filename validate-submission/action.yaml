@@ -54,6 +54,17 @@ inputs:
   show_warnings:
     description: "Print check-level warnings inline with their checks (true/false)."
     default: "false"
+  summary:
+    description: >-
+      Write a markdown summary of the check results and upload it as an artifact,
+      for a companion workflow to post back to the pull request (true/false).
+    default: "false"
+  artifact_name:
+    description: >-
+      Name of the artifact the summary is uploaded as. Coordination between this
+      action and the workflow that posts the result, not a hub setting — change
+      it only if you also pass a matching `artifact_name` to that workflow.
+    default: "submission-validation-results"
   # environment / setup
   extra_packages:
     description: >-
@@ -67,9 +78,31 @@ inputs:
     description: "Token used to read pull request files via the GitHub API."
     default: ${{ github.token }}
 
+outputs:
+  summary-path:
+    description: "Path the markdown summary was written to. Empty unless `summary` is enabled."
+    value: ${{ steps.paths.outputs.summary }}
+
 runs:
   using: composite
   steps:
+    # One place decides where the summary lives, so nothing downstream has to
+    # agree with a path spelled out in a caller's workflow.
+    - id: paths
+      shell: bash
+      env:
+        WANTED: ${{ inputs.summary }}
+      run: |
+        if [ "$WANTED" != "true" ]; then
+          echo "dir=" >> "$GITHUB_OUTPUT"
+          echo "summary=" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        dir="${RUNNER_TEMP}/validate-submission"
+        mkdir -p "$dir"
+        echo "dir=$dir" >> "$GITHUB_OUTPUT"
+        echo "summary=$dir/summary.md" >> "$GITHUB_OUTPUT"
+
     - uses: r-lib/actions/setup-r@v2
       with:
         install-r: false
@@ -106,4 +139,39 @@ runs:
         DERIVED_TASK_IDS: ${{ inputs.derived_task_ids }}
         VERBOSE: ${{ inputs.verbose }}
         SHOW_WARNINGS: ${{ inputs.show_warnings }}
+        SUMMARY_PATH: ${{ steps.paths.outputs.summary }}
       run: Rscript "${GITHUB_ACTION_PATH}/validate.R"
+
+    # Validation writes no summary if it never got as far as running — a failed
+    # apt update, an r-universe outage. Without this the artifact would carry
+    # nothing to post and the submitter would be back to a bare red cross.
+    #
+    # Deliberately duplicates the shape summary.R produces: R may never have
+    # installed, so this cannot go through render_exec_error().
+    - name: Fall back to a summary if validation could not run
+      if: ${{ !cancelled() && steps.paths.outputs.summary != '' }}
+      shell: bash
+      env:
+        SUMMARY: ${{ steps.paths.outputs.summary }}
+      run: |
+        if [ -s "$SUMMARY" ]; then
+          exit 0
+        fi
+        cat > "$SUMMARY" <<'EOF'
+        ## Submission validation
+
+        :x: **Validation did not complete.** The workflow failed before it could check this submission, which usually points at the hub's CI rather than the submission itself. The workflow log has the detail.
+        EOF
+
+    - name: Upload the summary
+      if: ${{ !cancelled() && steps.paths.outputs.summary != '' }}
+      uses: actions/upload-artifact@v5
+      with:
+        name: ${{ inputs.artifact_name }}
+        path: ${{ steps.paths.outputs.dir }}
+        if-no-files-found: error
+        # Re-runs share the workflow run, and v4+ artifacts are immutable, so
+        # without this the upload 409s on every re-run attempt.
+        overwrite: true
+        # Read by the companion workflow moments later, then dead.
+        retention-days: 1

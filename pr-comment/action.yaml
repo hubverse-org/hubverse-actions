@@ -58,6 +58,13 @@ runs:
             core.setFailed(`pr-comment: \`header\` must be a slug of letters, digits, \`-\` or \`_\`; got "${header}".`);
             return;
           }
+          // The revision goes into the marker and into the visible footer, so it
+          // has to be free of anything that could close the HTML comment or the
+          // code span.
+          if (revision && !/^[A-Za-z0-9._-]+$/.test(revision)) {
+            core.setFailed(`pr-comment: \`revision\` must be letters, digits, \`.\`, \`-\` or \`_\`; got "${revision}".`);
+            return;
+          }
           // Fold the revision into the marker: a new revision yields a new marker,
           // so no existing comment matches and a fresh comment is posted, leaving
           // earlier revisions' comments in place. Same revision (or none) matches
@@ -74,7 +81,18 @@ runs:
             core.setFailed('pr-comment: empty body (set `body` or `body_path`).');
             return;
           }
-          const body = `${marker}\n${raw}`;
+          // With a revision set, a pull request accumulates one comment per
+          // revision under identical headings. Say which one this is, since the
+          // marker that distinguishes them is invisible. Commit SHAs are
+          // abbreviated the way GitHub abbreviates them.
+          let footer = '';
+          if (revision) {
+            const label = /^[0-9a-f]{40}$/i.test(revision)
+              ? `commit \`${revision.slice(0, 7)}\``
+              : `revision \`${revision}\``;
+            footer = `\n\n---\n<sub>Results for ${label}</sub>`;
+          }
+          const body = `${marker}\n${raw}${footer}`;
 
           const issue_number = Number(process.env.PR);
           if (!Number.isInteger(issue_number) || issue_number <= 0) {
@@ -87,7 +105,15 @@ runs:
             issue_number,
             per_page: 100,
           });
-          const existing = comments.find((c) => c.body && c.body.includes(marker));
+          // Only ever adopt a comment posted by a bot, and only one whose marker
+          // is where this action puts it. The marker is predictable — the header
+          // is documented and the revision is the submitter's own commit — so a
+          // submitter could otherwise plant one and have the next run edit their
+          // comment, or bury another revision's marker in a body they control
+          // and have that revision's comment adopted instead.
+          const existing = comments.find(
+            (c) => c.user && c.user.type === 'Bot' && c.body && c.body.startsWith(marker)
+          );
 
           let id;
           if (existing) {
