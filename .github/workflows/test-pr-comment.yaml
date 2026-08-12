@@ -21,7 +21,7 @@ jobs:
     # Fork PRs get a read-only GITHUB_TOKEN and cannot post comments, so these
     # self-tests can only run on same-repo PRs.
     if: github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -81,7 +81,7 @@ jobs:
 
   revision:
     if: github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
@@ -180,7 +180,7 @@ jobs:
   invalid-inputs:
     # The input guards run before any API call, so no comment is posted and this
     # job works on fork PRs too, where the read-only token blocks the jobs above.
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 

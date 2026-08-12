@@ -35,7 +35,7 @@ jobs:
     # submission is accepted is the one that runs here, on their pull request.
     # Delete this line if your hub does want forks to validate their own copies.
     if: github.event.repository.fork != true
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 

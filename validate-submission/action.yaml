@@ -105,13 +105,8 @@ runs:
 
     - uses: r-lib/actions/setup-r@v2
       with:
-        install-r: false
         use-public-rspm: true
         extra-repositories: ${{ inputs.extra_repositories }}
-
-    - name: Update apt
-      shell: bash
-      run: sudo apt-get update
 
     - uses: r-lib/actions/setup-r-dependencies@v2
       env:
@@ -142,8 +137,8 @@ runs:
         SUMMARY_PATH: ${{ steps.paths.outputs.summary }}
       run: Rscript "${GITHUB_ACTION_PATH}/validate.R"
 
-    # Validation writes no summary if it never got as far as running — a failed
-    # apt update, an r-universe outage. Without this the artifact would carry
+    # Validation writes no summary if it never got as far as running — R failing
+    # to install, an r-universe outage. Without this the artifact would carry
     # nothing to post and the submitter would be back to a bare red cross.
     #
     # Deliberately duplicates the shape summary.R produces: R may never have
