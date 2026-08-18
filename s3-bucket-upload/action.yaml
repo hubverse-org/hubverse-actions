@@ -1,0 +1,111 @@
+name: "Upload hub data to an S3 bucket"
+description: >-
+  Sync a hub's directories to its hubverse-hosted AWS S3 bucket with rclone,
+  taking the bucket from the hub's admin config.
+author: "hubverse"
+
+inputs:
+  hub_path:
+    description: "Path to the hub root, relative to the checkout root."
+    default: "."
+  cloud_enabled:
+    description: >-
+      Whether to sync at all (true/false). Leave empty to read it from the 
+      hub's admin config. Setting it here overrides the config setting.
+    default: ""
+  storage_location:
+    description: >-
+      Bucket to sync to. Leave empty to read it from the hub's admin config.
+      Setting it here overrides the config setting.
+    default: ""
+  directories:
+    description: >-
+      Hub directories to sync, one per line. Each is synced to a directory
+      of the same name in the bucket, except `model-output`, which goes to
+      `raw/model-output`. A directory the hub does not have is skipped.
+    default: |
+      auxiliary-data
+      hub-config
+      model-abstracts
+      model-metadata
+      target-data
+      model-output
+  dry_run:
+    description: >-
+      Report what a sync would change without writing anything to the bucket
+      (true/false).
+    default: "false"
+  enforce_default_branch:
+    description: >-
+      Fail rather than sync when running from any branch other than the
+      repository's default branch (true/false). The bucket holds the hub's
+      canonical data, so this guards against a feature branch overwriting it.
+    default: "true"
+  aws_account:
+    description: >-
+      AWS account the hub's role belongs to. Defaults to the hubverse account.
+    default: "767397675902"
+  aws_region:
+    description: "AWS region the bucket lives in."
+    default: "us-east-1"
+
+outputs:
+  storage_location:
+    description: >-
+      Bucket the action synced to. Empty when cloud storage is not enabled, so
+      a later step can tell that nothing was uploaded.
+    value: ${{ steps.config.outputs.storage_location }}
+
+runs:
+  using: composite
+  steps:
+    - id: config
+      name: Work out whether and where to sync
+      shell: bash
+      env:
+        HUB_PATH: ${{ inputs.hub_path }}
+        CLOUD_ENABLED: ${{ inputs.cloud_enabled }}
+        STORAGE_LOCATION: ${{ inputs.storage_location }}
+        DRY_RUN: ${{ inputs.dry_run }}
+        ENFORCE_DEFAULT_BRANCH: ${{ inputs.enforce_default_branch }}
+      run: bash "${GITHUB_ACTION_PATH}/cloud-config.sh"
+
+    - name: Check this is the default branch
+      if: ${{ inputs.enforce_default_branch == 'true' && steps.config.outputs.cloud_enabled == 'true' }}
+      shell: bash
+      env:
+        REF: ${{ github.ref }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: bash "${GITHUB_ACTION_PATH}/check-branch.sh"
+
+    - name: Configure AWS credentials
+      # Request credentials to assume the hub's AWS role via OpenID Connect.
+      # The calling job needs `permissions: id-token: write`.
+      if: ${{ steps.config.outputs.cloud_enabled == 'true' }}
+      uses: aws-actions/configure-aws-credentials@v6
+      with:
+        role-to-assume: arn:aws:iam::${{ inputs.aws_account }}:role/${{ steps.config.outputs.storage_location }}
+        aws-region: ${{ inputs.aws_region }}
+
+    - name: Install rclone
+      # Install the latest rclone from the official script rather than the apt
+      # package. The Debian version is too old to parse the inline connection
+      # string the sync uses (":s3,provider=AWS,env_auth:...") and fails with
+      # "config name contains invalid characters".
+      # https://github.com/rclone/rclone/issues/6060
+      if: ${{ steps.config.outputs.cloud_enabled == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        curl -fsSL https://rclone.org/install.sh | sudo bash
+        rclone version
+
+    - name: Sync files to cloud storage
+      if: ${{ steps.config.outputs.cloud_enabled == 'true' }}
+      shell: bash
+      env:
+        HUB_PATH: ${{ inputs.hub_path }}
+        STORAGE_LOCATION: ${{ steps.config.outputs.storage_location }}
+        DIRECTORIES: ${{ inputs.directories }}
+        DRY_RUN: ${{ inputs.dry_run }}
+      run: bash "${GITHUB_ACTION_PATH}/sync.sh"

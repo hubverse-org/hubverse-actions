@@ -1,0 +1,86 @@
+name: Test s3-bucket-upload action
+
+# Self-tests the s3-bucket-upload action (referenced locally). Nothing here
+# reaches a bucket. The `scripts` job runs the shell behind the action against
+# fixture hubs with rclone stubbed out. The `action` job exercises the paths that
+# stop before the sync: cloud storage switched off, a config the action cannot
+# work from, and the default-branch guard.
+
+on:
+  pull_request:
+    paths:
+      - 's3-bucket-upload/**'
+      - '!**/README.md'
+      - '.github/workflows/test-s3-bucket-upload.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check the scripts for shell mistakes
+        run: shellcheck s3-bucket-upload/*.sh s3-bucket-upload/tests/*.sh
+
+      - name: Reading the hub's cloud config
+        run: bash s3-bucket-upload/tests/test-cloud-config.sh
+
+      - name: Syncing directories to the bucket
+        run: bash s3-bucket-upload/tests/test-sync.sh
+
+      - name: Refusing to sync from the wrong branch
+        run: bash s3-bucket-upload/tests/test-check-branch.sh
+
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run against a hub with cloud storage switched off
+        id: disabled
+        uses: ./s3-bucket-upload
+        with:
+          hub_path: s3-bucket-upload/tests/fixtures/disabled
+
+      - name: Run against a hub whose config gives no bucket
+        id: no-location
+        continue-on-error: true
+        uses: ./s3-bucket-upload
+        with:
+          hub_path: s3-bucket-upload/tests/fixtures/no-location
+
+      # This job runs on a pull request, so a cloud-enabled hub with the guard on
+      # must fail. What the guard refuses is covered by test-check-branch.sh.
+      # This only checks that the action still wires the guard in, and cannot
+      # tell that failure apart from a later one: without `id-token: write` this
+      # job would fail at the AWS step too. Read the log to see which it was.
+      - name: Run with the default-branch guard on, off the default branch
+        id: guard
+        continue-on-error: true
+        uses: ./s3-bucket-upload
+        with:
+          hub_path: s3-bucket-upload/tests/fixtures/enabled
+          enforce_default_branch: true
+
+      - name: Assert each run ended as it should
+        env:
+          DISABLED_BUCKET: ${{ steps.disabled.outputs.storage_location }}
+          NO_LOCATION: ${{ steps.no-location.outcome }}
+          GUARD: ${{ steps.guard.outcome }}
+        run: |
+          status=0
+          check() {
+            [ "$2" = failure ] && return 0
+            echo "$1 should fail the step, got: $2"
+            status=1
+          }
+          check "a config naming no bucket" "$NO_LOCATION"
+          check "the default-branch guard" "$GUARD"
+          if [ -n "$DISABLED_BUCKET" ]; then
+            echo "a hub with cloud storage off should sync nothing, got bucket: $DISABLED_BUCKET"
+            status=1
+          fi
+          exit "$status"
