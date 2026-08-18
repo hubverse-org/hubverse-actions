@@ -1,0 +1,11 @@
+{
+  "schema_version": "https://raw.githubusercontent.com/hubverse-org/schemas/main/v5.0.0/admin-schema.json",
+  "cloud": {
+    "enabled": false,
+    "host": {
+      "name": "aws",
+      "storage_location": "test-bucket",
+      "host_path": "test-bucket"
+    }
+  }
+}
