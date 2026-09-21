@@ -1,10 +1,9 @@
 # s3-bucket-upload
 
-Syncs a hub's directories to the hubverse-hosted AWS S3 bucket that serves the
-hub's data, using [rclone](https://rclone.org). The hub's admin config decides
-whether anything is uploaded and to which bucket, so a cloud-enabled hub needs
-no settings, and a hub without cloud storage is unaffected: the action reads the
-config and stops.
+Syncs a hub's directories to the AWS S3 bucket that serves the hub's data,
+using [rclone](https://rclone.org). The hub's admin config decides whether
+anything is uploaded and to which bucket, so a hub without cloud storage is
+unaffected: the action reads the config and stops.
 
 Most hubs get this through the [`hubverse-aws-upload`](../hubverse-aws-upload)
 workflow, which is this action with the triggers and permissions already set up.
@@ -14,7 +13,8 @@ step of a larger pipeline.
 ## Usage
 
 The job needs `id-token: write` to request the hub's AWS role, and a checkout
-for the action to read.
+for the action to read. The account and region are those of the hub's storage,
+and for a hubverse-hosted hub are the ones shown.
 
 ```yaml
 permissions:
@@ -25,6 +25,9 @@ steps:
   - uses: actions/checkout@v7
 
   - uses: hubverse-org/hubverse-actions/s3-bucket-upload@main
+    with:
+      aws_account: "767397675902"
+      aws_region: us-east-1
 ```
 
 Before this works, a member of the hubverse development team needs to
@@ -38,13 +41,12 @@ only, so a sync from anywhere else is refused by AWS.
 | Input | Default | Description |
 |---|---|---|
 | `hub_path` | `.` | Path to the hub root, relative to the checkout root. |
-| `cloud_enabled` | *(empty)* | Whether to sync at all. Empty takes it from the hub's admin config. |
 | `storage_location` | *(empty)* | Bucket to sync to. Empty takes it from the hub's admin config. |
 | `directories` | the six directories below | Hub directories to sync, one per line. |
 | `dry_run` | `false` | Report what a sync would change without writing anything. |
 | `enforce_default_branch` | `true` | Fail rather than sync when running from any branch other than the repository's default branch. |
-| `aws_account` | `767397675902` | AWS account the hub's role belongs to. Defaults to the hubverse account. |
-| `aws_region` | `us-east-1` | AWS region the bucket lives in. |
+| `aws_account` | *(required)* | AWS account the hub's role belongs to. |
+| `aws_region` | *(required)* | AWS region the bucket lives in. |
 
 ## Outputs
 
@@ -74,7 +76,9 @@ Syncing makes the bucket match the hub, so a file deleted from the hub is
 deleted from the bucket on the next run. A shorter `directories` list leaves a
 directory out altogether, and whatever the bucket already holds for it
 untouched. Directories the hub does not have are skipped, so the default list
-suits a hub with no `model-abstracts`.
+suits a hub with no `model-abstracts`. Each skip is reported as a notice in the
+run summary, so a misspelt entry in `directories` is visible without reading
+the log.
 
 ## Checking a sync before running it
 
@@ -83,6 +87,8 @@ suits a hub with no `model-abstracts`.
 ```yaml
 - uses: hubverse-org/hubverse-actions/s3-bucket-upload@main
   with:
+    aws_account: "767397675902"
+    aws_region: us-east-1
     dry_run: true
 ```
 
@@ -91,21 +97,17 @@ reading the bucket. That is also why it has to run from the default branch: a
 hub's role cannot be assumed from anywhere else, so `enforce_default_branch:
 false` moves the failure from this action to AWS rather than avoiding it.
 
-## Where the settings come from
+## Where the bucket comes from
 
-Whether cloud storage is enabled and which bucket to sync to can each come from
-the hub's admin config or from the matching input, and an input takes precedence
-over the config. A hub normally sets neither and lets its config decide.
+The bucket is `cloud.host.storage_location` in the hub's admin config, and the
+sync runs only when the config has `cloud.enabled` set to `true`. A hub normally
+leaves it at that.
 
-`storage_location` sends the sync to a different bucket from the one in the
-config, which is how to sync against a staging bucket. It still has to be a
-bucket the hub's AWS role can write to, which for a hubverse-hosted hub means its
-own. `cloud_enabled` decides whether the sync runs at all, whatever the config
-says.
-
-Together the two inputs also cover a repository with no admin config, since
-neither value is then read from one. If there is no config and neither input is
-set, the action fails: it cannot determine whether cloud storage is enabled.
+The `storage_location` input sends the sync to a different bucket from the one
+in the config, which is how to sync against a staging bucket. It still has to be
+a bucket the hub's AWS role can write to, which for a hubverse-hosted hub means
+its own. It does not turn the sync on: a hub whose config has cloud storage
+disabled syncs nothing whatever the input says.
 
 ## Notes
 
@@ -125,3 +127,5 @@ set, the action fails: it cannot determine whether cloud storage is enabled.
   `arn:aws:iam::<aws_account>:role/<storage_location>`. Onboarding sets a hub's
   role up that way, so `aws_account` only reaches an account whose roles follow
   the same convention.
+- `aws_account` and `aws_region` are only checked when the hub has cloud storage
+  enabled. A hub without it can call the action with neither set.

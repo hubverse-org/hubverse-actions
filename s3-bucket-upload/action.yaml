@@ -8,11 +8,6 @@ inputs:
   hub_path:
     description: "Path to the hub root, relative to the checkout root."
     default: "."
-  cloud_enabled:
-    description: >-
-      Whether to sync at all (true/false). Leave empty to read it from the 
-      hub's admin config. Setting it here overrides the config setting.
-    default: ""
   storage_location:
     description: >-
       Bucket to sync to. Leave empty to read it from the hub's admin config.
@@ -42,12 +37,11 @@ inputs:
       canonical data, so this guards against a feature branch overwriting it.
     default: "true"
   aws_account:
-    description: >-
-      AWS account the hub's role belongs to. Defaults to the hubverse account.
-    default: "767397675902"
+    description: "AWS account the hub's role belongs to."
+    required: true
   aws_region:
     description: "AWS region the bucket lives in."
-    default: "us-east-1"
+    required: true
 
 outputs:
   storage_location:
@@ -64,8 +58,9 @@ runs:
       shell: bash
       env:
         HUB_PATH: ${{ inputs.hub_path }}
-        CLOUD_ENABLED: ${{ inputs.cloud_enabled }}
         STORAGE_LOCATION: ${{ inputs.storage_location }}
+        AWS_ACCOUNT: ${{ inputs.aws_account }}
+        AWS_REGION: ${{ inputs.aws_region }}
         DRY_RUN: ${{ inputs.dry_run }}
         ENFORCE_DEFAULT_BRANCH: ${{ inputs.enforce_default_branch }}
       run: bash "${GITHUB_ACTION_PATH}/cloud-config.sh"

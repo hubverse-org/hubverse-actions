@@ -31,8 +31,10 @@ while read -r directory extra; do
     destination="$STORAGE_LOCATION/raw"
   fi
 
+  # A notice rather than a log line, so that a misspelt entry in `directories`
+  # shows in the run summary instead of quietly syncing nothing.
   if [ ! -d "$HUB_PATH/$directory" ]; then
-    echo "No $directory directory in the hub; skipping it."
+    echo "::notice::s3-bucket-upload: no $directory directory in the hub; skipping it."
     continue
   fi
 

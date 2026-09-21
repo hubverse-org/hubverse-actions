@@ -21,6 +21,10 @@ jobs:
 
       - uses: hubverse-org/hubverse-actions/s3-bucket-upload@main
         # The hub's admin config decides whether anything is uploaded and to
-        # which bucket, so most hubs need no settings here. The action's inputs
+        # which bucket. The account and region are those of hubverse-hosted
+        # storage, and a hub need not change them. The action's other inputs
         # change which directories are synced, and can report what a sync would
         # change without writing anything. See its README for the full list.
+        with:
+          aws_account: "767397675902"
+          aws_region: us-east-1
