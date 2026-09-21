@@ -1,29 +1,40 @@
 # hubverse-aws-upload
 
+Uploads the hub's data to its hubverse-hosted cloud storage on every push to
+`main`, so that what the cloud serves matches the repository.
 
-This action uploads hub data to Hubverse-hosted cloud storage. Currently, the workflow has a single job, `upload`,
-that pushes data to an AWS S3 bucket.
+The workflow's single job, `upload`, calls the
+[`s3-bucket-upload`](../s3-bucket-upload) action, which reads the hub's admin
+config (`admin.json`) and, when `cloud.enabled` is `true`, syncs these
+directories to the S3 bucket named in `cloud.host.storage_location`:
+`auxiliary-data`, `hub-config`, `model-abstracts`, `model-metadata`,
+`target-data` and `model-output`.
 
-The `upload` job perform the following steps:
+This workflow is safe to add to a hub that does not use cloud storage. If the
+admin config has no `cloud` group, or has `cloud.enabled` set to anything other
+than `true`, the job finds nothing to upload and stops before authenticating to
+AWS.
 
-1. Inspect the hub's admin config (`admin.json`) for a `cloud` group.
-2. If `cloud.enabled` is set to `true`:
-    - authenticate to the Hubverse AWS account
-    - use `cloud.host.storage_location` to determine the name of the hub's S3 bucket
-    - sync the following hub directories to the S3 bucket: `auxiliary-data`, `hub-config`, `model-abstracts`, `model-metadata`, `model-output`, `target-data`
+## Setting it up
 
-**Note**: This action is safe to use with non cloud-enabled hubs. 
-If the hub's `admin.config` does not contain a `cloud` group or has `cloud.enabled` set to anything other than `true`,
-the action will skip AWS-related steps.
+From the root of your hub:
 
+```r
+hubCI::use_hub_github_action("hubverse-aws-upload")
+```
+
+Nothing else needs configuring. To change what is uploaded, or to try a sync
+without writing anything, pass the action's inputs from the workflow's `uses:`
+step. [Its README](../s3-bucket-upload#inputs) lists them.
 
 ## AWS setup
 
-Before using this action, a member of the Hubverse development team will need to ["onboard" the hub to AWS](https://github.com/hubverse-org/hubverse-infrastructure?tab=readme-ov-file#onboarding-a-hub). Onboarding is
-a one-time process that creates:
+Before using this workflow, a member of the hubverse development team will need
+to ["onboard" the hub to AWS](https://github.com/hubverse-org/hubverse-infrastructure?tab=readme-ov-file#onboarding-a-hub).
+Onboarding is a one-time process that creates:
 
 - An AWS S3 bucket for the hub
 - A set of AWS permissions that allow the repo's GitHub workflows to write to the bucket
 
-**Important**: The repo's write permissions are limited to the `main` branch. Running this action on another branch
-or on a fork will fail.
+**Important**: The repo's write permissions are limited to the `main` branch.
+Running this workflow on another branch or on a fork will fail.
