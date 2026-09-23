@@ -1,0 +1,132 @@
+name: Test validate-target-data action
+
+# Exercises the validate-target-data composite action (referenced locally)
+# against the standing fixture PRs in hubverse-org/ci-testhub-target, asserting
+# each produces its expected pass/fail outcome and the matching pull request
+# summary. A separate job covers the rendering on its own, without a hub.
+#
+# Every run passes `comment: false`, so what no job here reaches is the posting
+# half. These jobs assert on the file the action writes; posting it is covered
+# by the pr-comment self-tests.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'validate-target-data/**'
+      # The write-up is validate-submission's, sourced by validate.R.
+      - 'validate-submission/summary.R'
+      - '!**/README.md'
+      - '.github/workflows/test-validate-target-data.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  # The rendering on its own, over a test hub bundled with hubUtils. No hub
+  # checkout and no token.
+  summary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+          extra-repositories: 'https://hubverse-org.r-universe.dev'
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        env:
+          GITHUB_PAT: ${{ github.token }}
+        with:
+          # Set for the same reason as in the composite action.
+          cache: 'always'
+          # Matched to the composite action's list, so that once a branch has run
+          # once these jobs share one setup-r-dependencies cache entry rather
+          # than building two. The key is the resolved package set.
+          packages: |
+            any::hubValidations
+            any::sessioninfo
+
+      - name: Run the summary tests
+        run: Rscript validate-target-data/tests/test-summary.R
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # PRs 4 and 5 appear twice, because whether each passes depends on an
+      # input, which is how the passthrough of inputs is covered.
+      matrix:
+        include:
+          - pr: 1   # adds a valid oracle-output file -> passes
+            expect: success
+          - pr: 4   # deletes the time-series dataset -> fails
+            expect: failure
+          - pr: 4   # the same deletion, allowed -> passes
+            expect: success
+            allow_target_type_deletion: true
+          - pr: 5   # deletes a file, which is allowed by default -> passes
+            expect: success
+          - pr: 5   # the same deletion, with modification checks on -> fails
+            expect: failure
+            file_modification_check: failure
+    steps:
+      - name: Checkout the action under test
+        uses: actions/checkout@v7
+
+      - name: Checkout the fixture hub at the PR head
+        uses: actions/checkout@v7
+        with:
+          repository: hubverse-org/ci-testhub-target
+          ref: refs/pull/${{ matrix.pr }}/head
+          path: testhub
+
+      - name: Validate fixture PR ${{ matrix.pr }}
+        id: validate
+        continue-on-error: true
+        uses: ./validate-target-data
+        with:
+          hub_path: testhub
+          gh_repo: hubverse-org/ci-testhub-target
+          pr_number: ${{ matrix.pr }}
+          # An unset matrix key is empty, and an empty input replaces the
+          # action's default rather than taking it, so each falls back to that
+          # default here.
+          allow_target_type_deletion: ${{ matrix.allow_target_type_deletion || 'false' }}
+          file_modification_check: ${{ matrix.file_modification_check || 'none' }}
+          # Asserted on below, from the file the action writes. Posting is
+          # covered by the pr-comment self-tests.
+          comment: false
+
+      - name: Assert outcome is ${{ matrix.expect }}
+        run: |
+          if [ "${{ steps.validate.outcome }}" != "${{ matrix.expect }}" ]; then
+            echo "::error::PR ${{ matrix.pr }}: expected '${{ matrix.expect }}', got '${{ steps.validate.outcome }}'"
+            exit 1
+          fi
+          echo "PR ${{ matrix.pr }}: outcome '${{ steps.validate.outcome }}' as expected"
+
+      - name: Assert the pull request summary matches
+        env:
+          # Taken from the action's output, so the test cannot drift from where
+          # the action actually writes.
+          SUMMARY: ${{ steps.validate.outputs.summary-path }}
+          EXPECT: ${{ matrix.expect }}
+          PR: ${{ matrix.pr }}
+        run: |
+          if [ ! -s "$SUMMARY" ]; then
+            echo "::error::PR $PR: no summary written to $SUMMARY"
+            exit 1
+          fi
+          echo "PR $PR summary:"
+          cat "$SUMMARY"
+          if [ "$EXPECT" = success ]; then
+            marker=':white_check_mark:'
+          else
+            marker=':x:'
+          fi
+          if ! grep -qF "$marker" "$SUMMARY"; then
+            echo "::error::PR $PR: summary does not carry $marker"
+            exit 1
+          fi
