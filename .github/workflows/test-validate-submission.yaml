@@ -39,6 +39,8 @@ jobs:
         env:
           GITHUB_PAT: ${{ github.token }}
         with:
+          # Set for the same reason as in the composite action.
+          cache: 'always'
           # Matched to the composite action's list, so that once a branch has run
           # once these jobs share one setup-r-dependencies cache entry rather than
           # building two. The key is the resolved package set.
