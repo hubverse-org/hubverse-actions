@@ -8,6 +8,8 @@ This repository stores [GitHub Actions](https://github.com/features/actions) for
 
 Each directory in this repository contains a GitHub Action that can be downloaded using `hubCI::use_hub_github_action()` and the name of the directory as the action name. Consult individual READMEs for details on each action.
 
+The `dependabot/` directory is the exception. It holds a Dependabot configuration a hub installs to keep the actions its workflows use up to date, and is not an action itself.
+
 
 ## Additional resources
 
