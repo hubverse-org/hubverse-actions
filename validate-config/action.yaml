@@ -1,0 +1,144 @@
+name: "Hub config validation"
+description: >-
+  Validate a hub's config files against the hubverse schema with
+  hubAdmin::validate_hub_config(), and write the result up for a pull request
+  comment.
+author: "hubverse"
+
+inputs:
+  # validate_hub_config() passthrough
+  hub_path:
+    description: "Path to the hub, relative to the checkout root."
+    default: "."
+  schema_version:
+    description: >-
+      Version of the hubverse schema to validate against, e.g. `v2.0.0`.
+      `from_config` takes it from the hub's own admin config.
+    default: "from_config"
+  schema_branch:
+    description: "Branch of the hubverse schemas repository to read the schema from."
+    default: "main"
+  # commenting
+  comment:
+    description: >-
+      Post the result as a pull request comment (true/false). Turn it off to
+      keep the result to the job summary and the workflow log.
+    default: "true"
+  comment_header:
+    description: >-
+      Key identifying the comment, so that re-running a commit edits it in place
+      rather than adding another. A repository validating more than one hub
+      needs a distinct key for each, or they overwrite each other's comment.
+    default: "config-validation"
+  # environment / setup
+  extra_repositories:
+    description: "Extra R package repositories passed to setup-r."
+    default: "https://hubverse-org.r-universe.dev"
+  github_token:
+    description: "Token used to install R packages from GitHub and to comment."
+    default: ${{ github.token }}
+
+outputs:
+  summary-path:
+    description: "Path the markdown summary was written to."
+    value: ${{ steps.paths.outputs.summary }}
+
+runs:
+  using: composite
+  steps:
+    # One place decides where the summary lives, so nothing downstream has to
+    # agree with a path spelled out in a caller's workflow.
+    - id: paths
+      shell: bash
+      run: |
+        dir="${RUNNER_TEMP}/validate-config"
+        mkdir -p "$dir"
+        # A job that runs the action twice would otherwise leave the first
+        # run's summary in place, and the fallback below would take it for this
+        # run's.
+        rm -f "$dir/summary.md"
+        echo "summary=$dir/summary.md" >> "$GITHUB_OUTPUT"
+
+    - uses: r-lib/actions/setup-r@v2
+      with:
+        use-public-rspm: true
+        extra-repositories: ${{ inputs.extra_repositories }}
+
+    - uses: r-lib/actions/setup-r-dependencies@v2
+      env:
+        GITHUB_PAT: ${{ inputs.github_token }}
+      with:
+        # A run fails whenever the config is invalid, which is the ordinary case
+        # on a pull request being worked on. The default only saves the cache
+        # when the workflow succeeds, so the packages would be reinstalled from
+        # scratch on every attempt until one passes.
+        cache: 'always'
+        packages: |
+          any::hubAdmin
+          any::sessioninfo
+
+    - name: Run config validations
+      shell: bash
+      env:
+        GITHUB_PAT: ${{ inputs.github_token }}
+        HUB_PATH: ${{ inputs.hub_path }}
+        SCHEMA_VERSION: ${{ inputs.schema_version }}
+        SCHEMA_BRANCH: ${{ inputs.schema_branch }}
+        SUMMARY_PATH: ${{ steps.paths.outputs.summary }}
+      run: Rscript "${GITHUB_ACTION_PATH}/validate.R"
+
+    # Validation writes no summary if it never got as far as running — R failing
+    # to install, an r-universe outage. Without this the caller would have no
+    # body to post and the pull request would be back to a bare red cross.
+    #
+    # Deliberately duplicates the shape summary.R produces: R may never have
+    # installed, so this cannot go through render_exec_error().
+    - name: Fall back to a summary if validation could not run
+      if: ${{ !cancelled() }}
+      shell: bash
+      env:
+        SUMMARY: ${{ steps.paths.outputs.summary }}
+      run: |
+        if [ -s "$SUMMARY" ]; then
+          exit 0
+        fi
+        cat > "$SUMMARY" <<'EOF'
+        ## Hub config validation
+
+        :x: **Config validation did not complete.** The workflow failed before it could check this hub's config files, which usually points at the hub's CI rather than the config. The workflow log has the detail.
+        EOF
+        cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+
+    # A comment needs a pull request to post to, and a token that may write to
+    # it. GitHub gives a pull request opened from a fork a read-only token,
+    # whatever permissions the workflow asks for. Such a run therefore reports
+    # on the job summary written above, and says so in the log.
+    #
+    # These conditions follow from GitHub's token rules, not from anything a hub
+    # chooses. They live here because a hub's copy of the workflow is frozen
+    # once added, and this is not something a hub should have to fix.
+    - name: Post the result on the pull request
+      if: >-
+        !cancelled() && inputs.comment == 'true' &&
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      uses: hubverse-org/hubverse-actions/pr-comment@main
+      with:
+        pr: ${{ github.event.number }}
+        header: ${{ inputs.comment_header }}
+        # Keying on the submitted commit posts a fresh comment per revision,
+        # which notifies, and keeps earlier results on the thread.
+        revision: ${{ github.event.pull_request.head.sha }}
+        body_path: ${{ steps.paths.outputs.summary }}
+        token: ${{ inputs.github_token }}
+
+    - name: Say where a fork pull request's result went instead
+      if: >-
+        !cancelled() && inputs.comment == 'true' &&
+        github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name != github.repository
+      shell: bash
+      run: >-
+        echo "::notice::This pull request comes from a fork, which GitHub gives
+        a read-only token, so the result cannot be posted as a comment. It is on
+        this run's summary page."
