@@ -205,6 +205,28 @@ expect(
   "an oversized execution error still shows some of the message"
 )
 
+# --- the wording another action passes in -------------------------------------
+
+# validate-target-data sources this file and renders under its own heading and
+# execution-error wording, so the defaults must be replaceable without leaking
+# the submission ones through.
+other <- render_summary(pass$lines, pass$failure, heading = "## Other validation")
+expect(
+  other[1] == "## Other validation",
+  "a caller's heading replaces the submission one"
+)
+
+other_exec <- render_exec_error(
+  "Error: something",
+  heading = "## Other validation",
+  status = ":x: **Other status.**"
+)
+expect(
+  other_exec[1] == "## Other validation" &&
+    any(other_exec == ":x: **Other status.**"),
+  "a caller's heading and status replace the submission ones"
+)
+
 # ------------------------------------------------------------------------------
 
 if (failures > 0L) {
