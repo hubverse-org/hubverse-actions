@@ -160,7 +160,7 @@ runs:
 
     - name: Upload the summary
       if: ${{ !cancelled() && steps.paths.outputs.summary != '' }}
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.artifact_name }}
         path: ${{ steps.paths.outputs.dir }}
