@@ -47,7 +47,7 @@ jobs:
           body_path: ${{ runner.temp }}/comment.md
 
       - name: Assert one comment, updated in place, then clean up
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ID_CREATE: ${{ steps.create.outputs.comment-id }}
           ID_UPDATE: ${{ steps.update.outputs.comment-id }}
@@ -123,7 +123,7 @@ jobs:
           body: "revision self-test: C."
 
       - name: Assert same-revision edits in place, new revision adds a comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           ID_A: ${{ steps.a.outputs.comment-id }}
           ID_A2: ${{ steps.a2.outputs.comment-id }}
