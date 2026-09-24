@@ -41,7 +41,7 @@ runs:
   using: composite
   steps:
     - id: comment
-      uses: actions/github-script@v7
+      uses: actions/github-script@v9
       env:
         PR: ${{ inputs.pr }}
         HEADER: ${{ inputs.header }}
