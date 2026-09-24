@@ -30,7 +30,7 @@ runs:
   using: composite
   steps:
     - id: resolve
-      uses: actions/github-script@v7
+      uses: actions/github-script@v9
       env:
         HEAD_OWNER: ${{ inputs.head_owner }}
         HEAD_BRANCH: ${{ inputs.head_branch }}
