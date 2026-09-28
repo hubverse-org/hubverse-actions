@@ -28,10 +28,11 @@ expect <- function(ok, what) {
   }
 }
 
-# A copy of the simple test hub, with `edits` applied to its tasks.json. Each
-# edit is a pattern and a replacement, and rewrites the first match on every
-# line that matches, so one edit can break several rounds at once.
-broken_hub <- function(edits = list()) {
+# A copy of the simple test hub bundled with hubUtils, with `edits` applied to
+# its tasks.json. Each edit is a pattern and a replacement, and rewrites the
+# first match on every line that matches, so one edit can break several rounds
+# at once. With no edits the copy is the hub as shipped, which is valid.
+test_hub <- function(edits = list()) {
   dir <- tempfile()
   dir.create(dir)
   file.copy(
@@ -55,7 +56,7 @@ validate <- function(hub) {
 
 # --- a hub that passes --------------------------------------------------------
 
-good <- validate(broken_hub())
+good <- validate(test_hub())
 
 expect(config_valid(good), "the unmodified test hub is valid")
 
@@ -72,7 +73,7 @@ expect(
 # --- a hub that fails ---------------------------------------------------------
 
 # A number where the schema wants a string, failing every round that sets it.
-bad <- validate(broken_hub(list(c('minimum": 0', 'minimum": "0"'))))
+bad <- validate(test_hub(list(c('minimum": 0', 'minimum": "0"'))))
 expect(!config_valid(bad), "the modified test hub is invalid")
 
 table_html <- error_table(bad)
@@ -131,6 +132,14 @@ expect(
 
 # --- an oversized table is truncated, not rejected by GitHub ------------------
 
+# hubAdmin marks every error message with a cross, so a heading row among the
+# rows would show up as a row without one.
+expect(
+  length(split_rows(table_html)$rows) ==
+    lengths(regmatches(table_html, gregexpr("\u274c", table_html))),
+  "every row in the table body is an error"
+)
+
 # Repeating the rows of a real table rather than breaking a hub badly enough to
 # produce hundreds of errors, which is slow and depends on how the schema
 # cascades.
@@ -172,6 +181,15 @@ expect(
     200L * length(split_rows(table_html)$rows) -
       length(split_rows(fitted$html)$rows),
   "the count of omitted errors matches the rows dropped"
+)
+
+# A gt release may add an attribute tidy_table() does not know to drop.
+# Truncation must still find the rows.
+attributed <- sub("<tbody>", '<tbody class="gt_table_body">', big, fixed = TRUE)
+attributed <- gsub("<tr>", '<tr role="row">', attributed, fixed = TRUE)
+expect(
+  truncate_table(attributed)$omitted == fitted$omitted,
+  "truncation still finds rows and body that carry attributes"
 )
 
 # The job summary has a budget of its own, large enough to hold what the comment
@@ -289,6 +307,25 @@ expect(
   sum(nchar(multibyte, type = "bytes")) <= AS_COMMENT$budget &&
     !any(is.na(nchar(multibyte))),
   "a multibyte line is cut on a character boundary, within the byte budget"
+)
+
+# --- an error table that would not render -------------------------------------
+
+# The config is invalid whether or not the table renders, and the summary must
+# say so.
+no_table <- render_table_error("Error in gt::as_raw_html(): no such element")
+
+expect(
+  has(no_table, "Invalid configuration"),
+  "a table that would not render still reports the config invalid"
+)
+expect(
+  has(no_table, "validate_hub_config()"),
+  "a table that would not render says how to see the errors"
+)
+expect(
+  has(no_table, "no such element"),
+  "a table that would not render includes the underlying message"
 )
 
 # ------------------------------------------------------------------------------

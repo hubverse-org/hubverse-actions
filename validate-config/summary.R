@@ -31,6 +31,10 @@ AS_JOB_SUMMARY <- list(
   remedy = "Run `hubAdmin::validate_hub_config()` on the hub to see them all."
 )
 
+# TODO: remove everything from here to truncate_table() once hubAdmin exports
+# the error data frame and the table is built from that instead. See
+# https://github.com/hubverse-org/hubverse-actions/issues/84.
+
 # Attributes gt writes for a browser. `style` and `class` carry the whole
 # visual design and are most of the file. GitHub's comment sanitiser drops both,
 # so every byte of them is wasted. The rest are presentational, and mean nothing
@@ -94,11 +98,15 @@ convert_cell_breaks <- function(html) {
   html
 }
 
-# Everything before the first error row, the error rows, and everything after.
-# NULL when there is no row body to split, so that truncate_table() returns the
-# table untouched rather than risking a half-serialised one.
+# Split the table into the markup before its first error row, the error rows,
+# and the markup after the last. NULL when there is no row body, so that
+# truncate_table() leaves the table untouched.
+#
+# Every row in the body is an error, since view_config_val_errors() uses no row
+# groups.
 split_rows <- function(html) {
-  open <- regexpr("<tbody>", html, fixed = TRUE)
+  # A tag may still carry an attribute tidy_table() did not know to drop.
+  open <- regexpr("<tbody\\b[^>]*>", html, perl = TRUE)
   close <- regexpr("</tbody>", html, fixed = TRUE)
   if (open == -1L || close == -1L || close < open) {
     return(NULL)
@@ -106,7 +114,12 @@ split_rows <- function(html) {
   body_start <- open + attr(open, "match.length")
   body <- substr(html, body_start, close - 1L)
   # Matched by byte for the same reason as convert_cell_breaks().
-  found <- gregexpr("(?s)<tr>.*?</tr>", body, perl = TRUE, useBytes = TRUE)
+  found <- gregexpr(
+    "(?s)<tr\\b[^>]*>.*?</tr>",
+    body,
+    perl = TRUE,
+    useBytes = TRUE
+  )
   rows <- regmatches(body, found)[[1]]
   Encoding(rows) <- "UTF-8"
   list(
@@ -242,16 +255,35 @@ fence <- function(lines) {
   c(paste0(ticks, "text"), lines, ticks)
 }
 
-# Reported when validation could not be run at all, so the pull request says so
-# rather than showing nothing but a failed check. Split on newlines because
-# truncation works a line at a time: as one string an oversized message would
-# cut to nothing but the notice.
-render_exec_error <- function(message, budget = AS_COMMENT$budget) {
+EXEC_FAIL <- paste(
+  ":x: **Config validation could not be run.** This usually points at the",
+  "hub's CI rather than the config files themselves."
+)
+
+FAIL_NO_TABLE <- paste(
+  ":x: **Invalid configuration.** Errors were found in one or more config",
+  "files in `hub-config/`, but the table listing them could not be rendered.",
+  "Run `hubAdmin::validate_hub_config()` on the hub to see them. Rendering",
+  "failed with:"
+)
+
+# A failure other than an invalid config, reported so that the pull request
+# shows more than a failed check. Split on newlines because truncation works a
+# line at a time: as one string an oversized message would cut to nothing but
+# the notice.
+render_error <- function(status, message, budget = AS_COMMENT$budget) {
   summary_doc(
-    paste(
-      ":x: **Config validation could not be run.** This usually points at the",
-      "hub's CI rather than the config files themselves."
-    ),
+    status,
     fence(truncate_lines(strsplit(message, "\n", fixed = TRUE)[[1]], budget))
   )
+}
+
+# Validation could not be run at all.
+render_exec_error <- function(message, budget = AS_COMMENT$budget) {
+  render_error(EXEC_FAIL, message, budget)
+}
+
+# Validation ran and failed the config, but error_table() could not render it.
+render_table_error <- function(message, budget = AS_COMMENT$budget) {
+  render_error(FAIL_NO_TABLE, message, budget)
 }

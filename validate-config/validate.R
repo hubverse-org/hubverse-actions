@@ -38,6 +38,15 @@ write_job_summary <- function(lines) {
 # sequences would land in the comment.
 options(cli.num_colors = 1)
 
+# An error report goes to the comment, the job summary and, so that the log
+# carries the message too, stderr.
+report_error <- function(render, condition) {
+  message <- conditionMessage(condition)
+  writeLines(render(message), summary_path, useBytes = TRUE)
+  write_job_summary(render(message, AS_JOB_SUMMARY$budget))
+  writeLines(message, stderr())
+}
+
 v <- tryCatch(
   hubAdmin::validate_hub_config(
     hub_path = Sys.getenv("HUB_PATH"),
@@ -48,10 +57,7 @@ v <- tryCatch(
 )
 
 if (inherits(v, "error")) {
-  message <- conditionMessage(v)
-  writeLines(render_exec_error(message), summary_path, useBytes = TRUE)
-  write_job_summary(render_exec_error(message, AS_JOB_SUMMARY$budget))
-  writeLines(message, stderr())
+  report_error(render_exec_error, v)
   fail(
     "Config validation could not be run",
     "See the pull request comment, or the error above, for details."
@@ -59,7 +65,22 @@ if (inherits(v, "error")) {
 }
 
 valid <- config_valid(v)
-table_html <- if (valid) NULL else error_table(v)
+
+# Left uncaught, a rendering failure would end the process before any summary
+# is written, and the fallback in action.yaml would then blame the hub's CI for
+# a config that is invalid.
+table_html <- if (valid) NULL else tryCatch(error_table(v), error = identity)
+
+if (inherits(table_html, "error")) {
+  report_error(render_table_error, table_html)
+  fail(
+    "Invalid Configuration",
+    paste(
+      "Errors were detected in one or more config files in 'hub-config/',",
+      "but the error table could not be rendered. See the error above."
+    )
+  )
+}
 
 writeLines(
   render_summary(valid, table_html, AS_COMMENT),
