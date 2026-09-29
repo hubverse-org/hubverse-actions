@@ -131,6 +131,17 @@ expect(
   "a cut job summary points at running the validation locally"
 )
 
+# The comment's size is the table at its cap plus the markdown around it, so
+# the cap has to leave room for that markdown under GitHub's limit.
+at_cap <- summary_doc(
+  INVALID,
+  c(strrep("x", AS_COMMENT$max_bytes), "", paste0("*", AS_COMMENT$remedy, "*"))
+)
+expect(
+  sum(nchar(at_cap, type = "bytes")) + length(at_cap) < 65536L,
+  "a table at the comment cap still leaves the comment under GitHub's limit"
+)
+
 # --- validation that could not run --------------------------------------------
 
 exec <- render_exec_error("Error: hub-config/tasks.json is not valid JSON.")

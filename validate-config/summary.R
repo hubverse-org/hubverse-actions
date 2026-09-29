@@ -47,17 +47,18 @@ INVALID <- paste(
   "files in `hub-config/`."
 )
 
-# hubAdmin returns NULL for a hub that passed. Otherwise it returns the table
-# cut to the destination's size, with a note below it on what was dropped and
-# the number of rows dropped in the `omitted` attribute.
+# hubAdmin is only asked for a table when the config failed, so a rendering
+# failure can never turn a passing hub into a failing one. The table comes cut
+# to the destination's size, with a note below it on what was dropped and the
+# number of rows dropped in the `omitted` attribute.
 render_summary <- function(v, dest) {
+  if (config_valid(v)) {
+    return(summary_doc(PASS))
+  }
   table_html <- hubAdmin::render_config_val_errors_html(
     v,
     max_bytes = dest$max_bytes
   )
-  if (is.null(table_html)) {
-    return(summary_doc(PASS))
-  }
   omitted <- attr(table_html, "omitted")
   summary_doc(
     INVALID,
