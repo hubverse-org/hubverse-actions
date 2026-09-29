@@ -57,10 +57,9 @@ validate <- function(hub) {
 # --- a hub that passes --------------------------------------------------------
 
 good <- validate(test_hub())
-
 expect(config_valid(good), "the unmodified test hub is valid")
 
-pass <- render_summary(TRUE)
+pass <- render_summary(good, AS_COMMENT)
 expect(
   has(pass, "Hub correctly configured"),
   "a valid config renders the success heading"
@@ -76,8 +75,14 @@ expect(
 bad <- validate(test_hub(list(c('minimum": 0', 'minimum": "0"'))))
 expect(!config_valid(bad), "the modified test hub is invalid")
 
-table_html <- error_table(bad)
-fail_md <- render_summary(FALSE, table_html)
+# config_valid() is documented as hubAdmin's own test, so the two must agree.
+expect(
+  is.null(hubAdmin::render_config_val_errors_html(good)) &&
+    !is.null(hubAdmin::render_config_val_errors_html(bad)),
+  "the verdict agrees with hubAdmin's on both hubs"
+)
+
+fail_md <- render_summary(bad, AS_COMMENT)
 
 expect(
   has(fail_md, "Invalid configuration"),
@@ -95,140 +100,35 @@ expect(
   !has(fail_md, "\033"),
   "the rendered summary carries no ANSI escapes"
 )
-
-# --- what tidy_table takes out, and what it must not --------------------------
-
-raw <- gt::as_raw_html(hubAdmin::view_config_val_errors(bad))
-
 expect(
-  !grepl("style=", table_html, fixed = TRUE) &&
-    !grepl("class=", table_html, fixed = TRUE),
-  "the styling GitHub would drop is removed"
-)
-expect(
-  nchar(table_html) < nchar(raw) / 4,
-  "the table is a fraction of the size gt renders"
-)
-expect(
-  grepl("<table>", table_html, fixed = TRUE) &&
-    grepl("<tbody>", table_html, fixed = TRUE),
-  "the table structure GitHub renders is kept"
+  !has(fail_md, AS_COMMENT$remedy),
+  "a table that fits gets no pointer elsewhere"
 )
 
-# gt separates the lines of an error path with newlines rather than `<br>`
-# tags, so without this conversion the sanitiser leaves them on one line.
+# --- a table too large for its destination is cut, not rejected by GitHub ----
+
+# A budget the table cannot fit, so that a cut can be seen without breaking a
+# hub badly enough to fill a comment. The pointer appears only after a cut, so
+# its presence also shows the cut happened.
+squeeze <- function(dest) list(max_bytes = 3000L, remedy = dest$remedy)
+
+cut_md <- render_summary(bad, squeeze(AS_COMMENT))
 expect(
-  grepl("rounds</strong><br>", table_html, fixed = TRUE),
-  "line breaks within a path tree become <br>"
+  has(cut_md, "<table>"),
+  "a cut table is still shown"
 )
 expect(
-  !grepl("<br>\n", table_html, fixed = TRUE),
-  "line breaks between markup do not become <br>"
-)
-expect(
-  grepl("<strong>", table_html, fixed = TRUE),
-  "the emphasis marking the failing key is kept"
+  has(cut_md, "job summary on the workflow run"),
+  "a cut comment points at the job summary"
 )
 
-# --- an oversized table is truncated, not rejected by GitHub ------------------
-
-# hubAdmin marks every error message with a cross, so a heading row among the
-# rows would show up as a row without one.
+# No report holds more than the job summary, so a cut job summary must not send
+# the reader back to the job summary.
+cut_js <- render_summary(bad, squeeze(AS_JOB_SUMMARY))
 expect(
-  length(split_rows(table_html)$rows) ==
-    lengths(regmatches(table_html, gregexpr("\u274c", table_html))),
-  "every row in the table body is an error"
-)
-
-# Repeating the rows of a real table rather than breaking a hub badly enough to
-# produce hundreds of errors, which is slow and depends on how the schema
-# cascades.
-inflate <- function(html, times) {
-  parts <- split_rows(html)
-  paste0(
-    parts$head,
-    paste(rep(parts$rows, times), collapse = ""),
-    parts$tail
-  )
-}
-
-big <- inflate(table_html, 200L)
-expect(nchar(big, type = "bytes") > 65536L, "the inflated table is oversized")
-
-big_md <- render_summary(FALSE, big)
-expect(
-  sum(nchar(big_md, type = "bytes")) + length(big_md) < 65536L,
-  "an oversized table is brought under GitHub's comment limit"
-)
-expect(
-  has(big_md, "further errors omitted"),
-  "truncation says so"
-)
-
-fitted <- truncate_table(big)
-expect(
-  length(gregexpr("<tr>", fitted$html)[[1]]) ==
-    length(gregexpr("</tr>", fitted$html)[[1]]),
-  "truncation leaves whole rows, so the table still closes"
-)
-expect(
-  grepl("</tbody>", fitted$html, fixed = TRUE) &&
-    grepl("</table>", fitted$html, fixed = TRUE),
-  "truncation keeps the end of the table"
-)
-expect(
-  fitted$omitted ==
-    200L * length(split_rows(table_html)$rows) -
-      length(split_rows(fitted$html)$rows),
-  "the count of omitted errors matches the rows dropped"
-)
-
-# A gt release may add an attribute tidy_table() does not know to drop.
-# Truncation must still find the rows.
-attributed <- sub("<tbody>", '<tbody class="gt_table_body">', big, fixed = TRUE)
-attributed <- gsub("<tr>", '<tr role="row">', attributed, fixed = TRUE)
-expect(
-  truncate_table(attributed)$omitted == fitted$omitted,
-  "truncation still finds rows and body that carry attributes"
-)
-
-# The job summary has a budget of its own, large enough to hold what the comment
-# had to drop.
-expect(
-  truncate_table(big, AS_JOB_SUMMARY$budget)$omitted == 0L,
-  "the job summary keeps every error the comment dropped"
-)
-
-expect(
-  has(big_md, "job summary on the workflow run"),
-  "a truncated comment points at the job summary"
-)
-
-# No report holds more errors than the job summary, so a truncated job summary
-# must not send the reader back to the job summary for what it just dropped.
-huge <- inflate(table_html, 400L)
-huge_md <- render_summary(FALSE, huge, AS_JOB_SUMMARY)
-expect(
-  has(huge_md, "further errors omitted"),
-  "an oversized job summary is truncated too"
-)
-expect(
-  !has(huge_md, "job summary on the workflow run"),
-  "a truncated job summary does not point at itself"
-)
-expect(
-  has(huge_md, "validate_hub_config()"),
-  "a truncated job summary says how to see the rest"
-)
-
-# A single row larger than the whole budget fits nowhere. The table must still
-# close, and the note must still say what happened.
-one_big_row <- inflate(table_html, 1L)
-tiny <- truncate_table(one_big_row, 100L)
-expect(
-  tiny$omitted == length(split_rows(table_html)$rows) &&
-    grepl("</table>", tiny$html, fixed = TRUE),
-  "a budget nothing fits in still yields a closed table and a count"
+  !has(cut_js, "job summary on the workflow run") &&
+    has(cut_js, "validate_hub_config()"),
+  "a cut job summary points at running the validation locally"
 )
 
 # --- validation that could not run --------------------------------------------
@@ -304,7 +204,7 @@ expect(
 # boundary to stay valid UTF-8 and inside the budget.
 multibyte <- truncate_lines(strrep("é", 40000L))
 expect(
-  sum(nchar(multibyte, type = "bytes")) <= AS_COMMENT$budget &&
+  sum(nchar(multibyte, type = "bytes")) <= AS_COMMENT$max_bytes &&
     !any(is.na(nchar(multibyte))),
   "a multibyte line is cut on a character boundary, within the byte budget"
 )
@@ -313,7 +213,7 @@ expect(
 
 # The config is invalid whether or not the table renders, and the summary must
 # say so.
-no_table <- render_table_error("Error in gt::as_raw_html(): no such element")
+no_table <- render_table_error("Error in markdown_html(): no such element")
 
 expect(
   has(no_table, "Invalid configuration"),

@@ -19,14 +19,11 @@ fail <- function(title, message) {
   quit(status = 1)
 }
 
-# action.yaml creates the directory this path points into.
-summary_path <- Sys.getenv("SUMMARY_PATH")
-
 # The job summary is what a pull request from a fork gets, since such a run
 # cannot be commented on. Appended rather than overwritten, as GitHub builds it
-# from every step that writes to it.
-write_job_summary <- function(lines) {
-  path <- Sys.getenv("GITHUB_STEP_SUMMARY")
+# from every step that writes to it. GitHub Actions sets the path; it is empty
+# anywhere else, and then nothing is written.
+write_job_summary <- function(lines, path = Sys.getenv("GITHUB_STEP_SUMMARY")) {
   if (!nzchar(path)) {
     return(invisible())
   }
@@ -38,12 +35,26 @@ write_job_summary <- function(lines) {
 # sequences would land in the comment.
 options(cli.num_colors = 1)
 
-# An error report goes to the comment, the job summary and, so that the log
-# carries the message too, stderr.
+# Every report goes to the comment file and to the job summary, rendered for
+# each. Both renderings happen before either write, so a failure in the second
+# leaves nothing half published. action.yaml creates the directory the comment
+# path points into.
+publish <- function(
+  render,
+  comment = AS_COMMENT,
+  job_summary = AS_JOB_SUMMARY,
+  comment_path = Sys.getenv("SUMMARY_PATH")
+) {
+  for_comment <- render(comment)
+  for_job_summary <- render(job_summary)
+  writeLines(for_comment, comment_path, useBytes = TRUE)
+  write_job_summary(for_job_summary)
+}
+
+# An error also goes to stderr, so that the log carries the message.
 report_error <- function(render, condition) {
   message <- conditionMessage(condition)
-  writeLines(render(message), summary_path, useBytes = TRUE)
-  write_job_summary(render(message, AS_JOB_SUMMARY$budget))
+  publish(function(dest) render(message, dest))
   writeLines(message, stderr())
 }
 
@@ -69,10 +80,13 @@ valid <- config_valid(v)
 # Left uncaught, a rendering failure would end the process before any summary
 # is written, and the fallback in action.yaml would then blame the hub's CI for
 # a config that is invalid.
-table_html <- if (valid) NULL else tryCatch(error_table(v), error = identity)
+published <- tryCatch(
+  publish(function(dest) render_summary(v, dest)),
+  error = identity
+)
 
-if (inherits(table_html, "error")) {
-  report_error(render_table_error, table_html)
+if (inherits(published, "error")) {
+  report_error(render_table_error, published)
   fail(
     "Invalid Configuration",
     paste(
@@ -81,13 +95,6 @@ if (inherits(table_html, "error")) {
     )
   )
 }
-
-writeLines(
-  render_summary(valid, table_html, AS_COMMENT),
-  summary_path,
-  useBytes = TRUE
-)
-write_job_summary(render_summary(valid, table_html, AS_JOB_SUMMARY))
 
 if (!valid) {
   fail(

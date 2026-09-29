@@ -132,30 +132,21 @@ It reports one output, for a workflow that also needs the result as a file:
 |---|---|
 | `summary-path` | Where the written-up result was saved. Always written, including when validation could not run. |
 
-## For maintainers: why the error table is stripped down
+## For maintainers: where the error table comes from
 
 The table is `hubAdmin`'s.
-[`view_config_val_errors()`](https://hubverse-org.github.io/hubAdmin/reference/view_config_val_errors.html)
-decides which errors are worth showing and how to present them, and `summary.R`
-takes what that returns. What it changes is the HTML, not the table.
+[`render_config_val_errors_html()`](https://hubverse-org.github.io/hubAdmin/reference/render_config_val_errors_html.html)
+decides which errors are worth showing and how to present them, and renders
+them with only the markup GitHub displays in a comment. `summary.R` takes that
+as it comes and fits it to the destination.
 
-`hubAdmin` renders through [`gt`](https://gt.rstudio.com), which produces HTML
-meant for a browser: the whole visual design is repeated inline on every cell.
-GitHub's comment sanitiser discards `style` and `class`, so none of that weight
-reaches the reader.
-
-The cost is not only wasted bytes. `gt` lays the error paths out with
-`white-space: pre` and emits no line breaks of its own, so once the styling has
-been dropped every path arrives flattened onto a single line.
-
-`summary.R` therefore reduces the markup to what GitHub actually renders, and
-turns the line breaks within cells into `<br>`. That leaves it readable and
-around a seventh of its original size. It matters at the size a real config
-reaches: GitHub rejects a comment over 65,536 characters outright, and before
-this a single mistyped key in `tasks.json` could produce enough errors to pass
-that and get no comment at all. What is still too large is cut to fit, keeping the
-earliest errors, since config errors cascade and fixing those often clears the
-rest. The run's summary page has a far larger budget and keeps them all.
+GitHub rejects a comment over 65,536 characters outright, and a single mistyped
+key in `tasks.json` can produce enough errors to pass that. `hubAdmin` cuts the
+table to the size the action gives it for each destination, keeping the earliest
+errors, since config errors cascade and fixing those often clears the rest, and
+noting how many were left out. A cut comment points at the run's summary page,
+which has a far larger budget. A cut summary page points at running the
+validation locally.
 
 [^token]: In GitHub's own terms: a `pull_request` workflow triggered from a fork
     gets a read-only `GITHUB_TOKEN`. `pull-requests: write` is downgraded and

@@ -115,13 +115,6 @@ jobs:
             echo "::error::the summary carries no error table"
             status=1
           fi
-          # The local tests run against whichever gt is installed on a developer's
-          # machine; this runs against whichever gt r-universe resolves to today.
-          # A gt release that changed the markup would show up here first.
-          if grep -qF 'style=' "$SUMMARY"; then
-            echo "::error::styling GitHub discards was left in the summary"
-            status=1
-          fi
           size=$(wc -c < "$SUMMARY")
           if [ "$size" -ge 65536 ]; then
             echo "::error::summary is $size bytes, over GitHub's comment limit"
