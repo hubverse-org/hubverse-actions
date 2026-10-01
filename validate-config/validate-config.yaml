@@ -1,5 +1,13 @@
 name: Hub Config Validation (R)
 
+# Checks the hub's config files against the hubverse schema when a pull request
+# changes them, and posts the result on that pull request. Add it with:
+#
+#   hubCI::use_hub_github_action("validate-config")
+#
+# The steps live in hubverse-actions rather than here, so that fixes to them
+# reach you without you having to add a new copy of this file.
+
 on:
   workflow_dispatch:
   pull_request:
@@ -11,45 +19,19 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  issues: write
 
 jobs:
+  # Hubs put this job's name in their branch protection rules, so renaming it
+  # silently stops their required check from ever reporting.
   validate-hub-config:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
-      PR_NUMBER: ${{ github.event.number }}
-      HUB_PATH: ${{ github.workspace }}
-
     steps:
       - uses: actions/checkout@v7
 
-      - uses: r-lib/actions/setup-r@v2
-        with:
-          use-public-rspm: true
-          extra-repositories: 'https://hubverse-org.r-universe.dev'
-
-      - uses: r-lib/actions/setup-r-dependencies@v2
-        with:
-          cache: 'always'
-          packages: |
-            any::hubAdmin
-            any::sessioninfo
-
-      - name: Run validations
-        id: validate
-        run: hubAdmin::ci_validate_hub_config(diff = "${{ runner.temp }}/diff.md")
-        shell: Rscript {0}
-      - name: "Comment on PR"
-        id: comment-diff
-        if: ${{ github.event_name != 'workflow_dispatch' }}
-        uses: carpentries/actions/comment-diff@v0.18.0
-        with:
-          pr: ${{ env.PR_NUMBER }}
-          path: ${{ runner.temp }}/diff.md
-      - name: Error on Failure
-        if: ${{ steps.validate.outputs.result == 'false' }}
-        run: |
-          echo "::error title=Invalid Configuration::Errors were detected in one or more config files in 'hub-config/'"
-          exit 1
-
+      - uses: hubverse-org/hubverse-actions/validate-config@main
+        # Set `hub_path` when the hub is not at the repository root, e.g. a demo
+        # hub shipped inside a package, and change the `paths:` filter above to
+        # match. Commenting is on by default; see the action README for the full
+        # list of settings.
+        # with:
+        #   hub_path: inst/demo_hub
