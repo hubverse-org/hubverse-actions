@@ -13,7 +13,6 @@ name: Hub Submission Validation (R)
 # change it there too, or results will quietly stop being posted.
 
 on:
-  workflow_dispatch:
   pull_request:
     branches: main
     paths:
