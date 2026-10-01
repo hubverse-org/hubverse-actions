@@ -16,9 +16,18 @@ notes instead of being discovered when the old major stops working.
 
 ## Setting it up
 
-Copy `dependabot.yml` to `.github/dependabot.yml` in the hub and commit it.
-Dependabot runs from the default branch, so nothing happens until the file is on
-`main`. The file must keep that exact name and location for GitHub to read it.
+From the root of your hub:
+
+```r
+hubCI::use_hub_dependabot()
+```
+
+This needs hubCI 0.1.0 or later. It writes the configuration to
+`.github/dependabot.yml`, which then has to be committed. Dependabot runs from
+the default branch, so nothing happens until the file is on `main`.
+
+`dependabot.yml` can also be copied there by hand. The file must keep that exact
+name and location for GitHub to read it.
 
 If the hub already has a `.github/dependabot.yml` for another ecosystem, add the
 `github-actions` entry from this file to it rather than replacing the file.

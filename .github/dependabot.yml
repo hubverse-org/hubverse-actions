@@ -9,5 +9,10 @@ updates:
       - "/*"
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
+        group-by: dependency-name
     commit-message:
       prefix: "Dependabot"
