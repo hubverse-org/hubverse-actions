@@ -112,6 +112,8 @@ runs:
       env:
         GITHUB_PAT: ${{ inputs.github_token }}
       with:
+        # Cache the installed packages even when validation fails.
+        cache: 'always'
         packages: |
           any::hubValidations
           any::sessioninfo

@@ -3,8 +3,22 @@
 # Kept apart from validate.R, which reads the action's inputs and orchestrates
 # the run, so that these can be exercised without a hub or a GitHub API call.
 # See tests/test-summary.R.
+#
+# validate-target-data/validate.R sources this file too, as check_for_errors()
+# reports target data results in the same form. It passes its own `heading` and
+# `status` to the render functions; the defaults below are the submission
+# wording. Renaming an argument of a function here, or adding a required one,
+# therefore means changing validate-target-data/validate.R as well.
+#
+# TODO(#71): holding shared code in this action's directory is temporary. This
+# file moves to a top-level R/.
 
 HEADING <- "## Submission validation"
+
+EXEC_STATUS <- paste(
+  ":x: **Validation could not be run.** This is usually a problem with the hub",
+  "rather than the submission, so ask the hub administrators to take a look."
+)
 
 # GitHub rejects a comment body over 65,536 characters outright, so a submission
 # touching enough files to run past that would otherwise get no comment at all.
@@ -101,7 +115,7 @@ fence <- function(lines) {
   c(paste0(ticks, "text"), lines, ticks)
 }
 
-summary_doc <- function(status, lines, collapse = FALSE) {
+summary_doc <- function(status, lines, collapse = FALSE, heading = HEADING) {
   block <- fence(truncate_lines(lines))
   if (collapse) {
     block <- c(
@@ -112,22 +126,24 @@ summary_doc <- function(status, lines, collapse = FALSE) {
       "</details>"
     )
   }
-  c(HEADING, "", status, "", block)
+  c(heading, "", status, "", block)
 }
 
 # A passing run collapses the detail; a failure is what the submitter opened the
 # pull request to find out about, so it stays expanded.
-render_summary <- function(lines, failure) {
+render_summary <- function(lines, failure, heading = HEADING) {
   if (is.null(failure)) {
     summary_doc(
       ":white_check_mark: **All validation checks passed.**",
       lines,
-      collapse = TRUE
+      collapse = TRUE,
+      heading = heading
     )
   } else {
     summary_doc(
       ":x: **Validation failed.** The checks below did not pass. Push a new commit to the pull request to re-run them.",
-      lines
+      lines,
+      heading = heading
     )
   }
 }
@@ -136,9 +152,10 @@ render_summary <- function(lines, failure) {
 # rather than showing nothing but a failed check. Split on newlines because
 # truncation works a line at a time: as one string an oversized message would cut
 # to nothing but the "lines omitted" notice.
-render_exec_error <- function(message) {
+render_exec_error <- function(message, heading = HEADING, status = EXEC_STATUS) {
   summary_doc(
-    ":x: **Validation could not be run.** This is usually a problem with the hub rather than the submission, so ask the hub administrators to take a look.",
-    strsplit(message, "\n", fixed = TRUE)[[1]]
+    status,
+    strsplit(message, "\n", fixed = TRUE)[[1]],
+    heading = heading
   )
 }
