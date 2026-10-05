@@ -83,7 +83,7 @@ or every nested call fails to resolve.
    ```
 2. In one pull request, change every `@v2` reference to `@v3`:
    ```sh
-   grep -rn 'hubverse-org/hubverse-actions/[^@ ]*@' --include='*.yaml' .
+   grep -rn 'hubverse-org/hubverse-actions/[^@ ]*@' --include='*.yaml' --include='*.md' .
    ```
    The nested calls in the pull request's CI resolve to the tag from step 1.
    Merge it.
