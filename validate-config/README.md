@@ -82,7 +82,7 @@ filter at the top of the workflow to match:
 +      - 'inst/demo_hub/hub-config/**'
        - '!**README**'
  ...
-       - uses: hubverse-org/hubverse-actions/validate-config@main
+       - uses: hubverse-org/hubverse-actions/validate-config@v2
 +        with:
 +          hub_path: inst/demo_hub
 ```
@@ -104,7 +104,7 @@ package, say — runs the action once per hub. Give each run its own
 `comment_header`, or the second overwrites the first's comment:
 
 ```yaml
-- uses: hubverse-org/hubverse-actions/validate-config@main
+- uses: hubverse-org/hubverse-actions/validate-config@v2
   with:
     hub_path: inst/demo_hub
     comment_header: config-validation-demo
@@ -123,7 +123,7 @@ permissions:
 
 steps:
   - uses: actions/checkout@v7
-  - uses: hubverse-org/hubverse-actions/validate-config@main
+  - uses: hubverse-org/hubverse-actions/validate-config@v2
 ```
 
 It reports one output, for a workflow that also needs the result as a file:

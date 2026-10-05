@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: hubverse-org/hubverse-actions/validate-config@main
+      - uses: hubverse-org/hubverse-actions/validate-config@v2
         # Set `hub_path` when the hub is not at the repository root, e.g. a demo
         # hub shipped inside a package, and change the `paths:` filter above to
         # match. Commenting is on by default; see the action README for the full

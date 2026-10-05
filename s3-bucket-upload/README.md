@@ -24,7 +24,7 @@ permissions:
 steps:
   - uses: actions/checkout@v7
 
-  - uses: hubverse-org/hubverse-actions/s3-bucket-upload@main
+  - uses: hubverse-org/hubverse-actions/s3-bucket-upload@v2
     with:
       aws_account: "767397675902"
       aws_region: us-east-1
@@ -85,7 +85,7 @@ the log.
 `dry_run` reports what a sync would change and writes nothing:
 
 ```yaml
-- uses: hubverse-org/hubverse-actions/s3-bucket-upload@main
+- uses: hubverse-org/hubverse-actions/s3-bucket-upload@v2
   with:
     aws_account: "767397675902"
     aws_region: us-east-1

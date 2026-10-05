@@ -21,7 +21,7 @@ permissions:
   pull-requests: write
 
 steps:
-  - uses: hubverse-org/hubverse-actions/pr-comment@main
+  - uses: hubverse-org/hubverse-actions/pr-comment@v2
     with:
       pr: ${{ github.event.number }}
       header: submission-validation
@@ -64,7 +64,7 @@ faster than runs finish, when GitHub groups several commits into one entry, or
 when the comment is read from a notification.
 
 ```yaml
-- uses: hubverse-org/hubverse-actions/pr-comment@main
+- uses: hubverse-org/hubverse-actions/pr-comment@v2
   with:
     pr: ${{ github.event.number }}
     header: submission-validation

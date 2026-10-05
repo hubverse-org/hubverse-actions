@@ -38,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: hubverse-org/hubverse-actions/validate-submission@main
+      - uses: hubverse-org/hubverse-actions/validate-submission@v2
         with:
           # Report the result on the pull request. Set to false to keep the
           # result in the workflow log only.

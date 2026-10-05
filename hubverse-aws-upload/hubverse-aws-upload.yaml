@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: hubverse-org/hubverse-actions/s3-bucket-upload@main
+      - uses: hubverse-org/hubverse-actions/s3-bucket-upload@v2
         # The hub's admin config decides whether anything is uploaded and to
         # which bucket. The account and region are those of hubverse-hosted
         # storage, and a hub need not change them. The action's other inputs

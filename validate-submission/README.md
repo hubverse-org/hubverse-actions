@@ -133,7 +133,7 @@ takes is available as a setting. Add them under `with:` on the
 `validate-submission` step in your workflow file:
 
 ```yaml
-- uses: hubverse-org/hubverse-actions/validate-submission@main
+- uses: hubverse-org/hubverse-actions/validate-submission@v2
   with:
     summary: true
     skip_submit_window_check: true
@@ -168,7 +168,7 @@ can be called directly. It assumes the repository is already checked out.
 ```yaml
 steps:
   - uses: actions/checkout@v7
-  - uses: hubverse-org/hubverse-actions/validate-submission@main
+  - uses: hubverse-org/hubverse-actions/validate-submission@v2
     with:
       skip_submit_window_check: true
 ```

@@ -122,7 +122,7 @@ runs:
         !cancelled() && inputs.comment == 'true' &&
         github.event_name == 'pull_request' &&
         github.event.pull_request.head.repo.full_name == github.repository
-      uses: hubverse-org/hubverse-actions/pr-comment@main
+      uses: hubverse-org/hubverse-actions/pr-comment@v2
       with:
         pr: ${{ github.event.number }}
         header: ${{ inputs.comment_header }}
