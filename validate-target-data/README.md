@@ -82,7 +82,7 @@ takes is available as a setting. Add them under `with:` on the
 `validate-target-data` step in your workflow file:
 
 ```yaml
-- uses: hubverse-org/hubverse-actions/validate-target-data@main
+- uses: hubverse-org/hubverse-actions/validate-target-data@v2
   with:
     file_modification_check: error
 ```
@@ -126,7 +126,7 @@ permissions:
 
 steps:
   - uses: actions/checkout@v7
-  - uses: hubverse-org/hubverse-actions/validate-target-data@main
+  - uses: hubverse-org/hubverse-actions/validate-target-data@v2
 ```
 
 It reports one output, for a workflow that also needs the result as a file:

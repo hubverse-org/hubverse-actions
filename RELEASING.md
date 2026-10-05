@@ -75,18 +75,16 @@ Files in this repository reference each other in full, as
 `validate-config/action.yaml` does with
 `hubverse-org/hubverse-actions/pr-comment@v2`, because `uses:` takes no
 expressions. The new major tag must therefore exist before any file names it,
-or every nested call fails to resolve.
+or every nested call fails to resolve. The steps below use the move from `v2`
+to `v3` as the example.
 
 1. Create the new major tag on the tip of `main`, with no release:
    ```sh
    git tag v3 origin/main && git push origin v3
    ```
-2. In one pull request, change every `@v2` reference to `@v3`:
-   ```sh
-   grep -rn 'hubverse-org/hubverse-actions/[^@ ]*@' --include='*.yaml' --include='*.md' .
-   ```
-   The nested calls in the pull request's CI resolve to the tag from step 1.
-   Merge it.
+2. In one pull request, change every reference from the old major tag to the
+   new one. `ci-references.yaml` lists any that were missed. The nested calls
+   in the pull request's CI resolve to the tag from step 1. Merge it.
 3. Release `v3.0.0` from the merge commit with the checklist above.
 
 ## Previous majors

@@ -1,0 +1,41 @@
+name: Check references to this repository
+
+# Fails if a reference to this repository is not at a floating major tag, or
+# if the references use more than one tag. RELEASING.md describes the tags.
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  references:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Every reference uses the same floating major tag
+        run: |
+          set -euo pipefail
+          pattern='hubverse-org/hubverse-actions/[^@[:space:]]*@[A-Za-z0-9._/-]+'
+          matches=$(grep -rnoE "$pattern" --include='*.yaml' --include='*.yml' --include='*.md' .) || {
+            echo "::error::no references to this repository found; the pattern in this check is probably wrong."
+            exit 1
+          }
+          status=0
+          while IFS=: read -r file line match; do
+            # A reference ending a sentence takes the full stop with it.
+            ref="${match##*@}"
+            ref="${ref%.}"
+            if [[ ! "$ref" =~ ^v[0-9]+$ ]]; then
+              echo "::error file=${file#./},line=$line::reference at @$ref is not a floating major tag."
+              status=1
+            fi
+          done <<< "$matches"
+          tags=$(sed -E 's/.*@//; s/\.$//' <<< "$matches" | sort -u)
+          if [[ "$tags" == *$'\n'* ]]; then
+            echo "::error::references to this repository use more than one tag: $(tr '\n' ' ' <<< "$tags")"
+            status=1
+          fi
+          exit "$status"

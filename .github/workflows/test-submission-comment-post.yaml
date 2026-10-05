@@ -43,8 +43,10 @@ jobs:
       contents: read
       pull-requests: write
     steps:
+      - uses: actions/checkout@v7
+
       - id: pr
-        uses: hubverse-org/hubverse-actions/resolve-pr@main
+        uses: ./resolve-pr
 
       - name: Assert it landed on the right pull request
         if: steps.pr.outputs.number != ''
@@ -80,8 +82,10 @@ jobs:
       contents: read
       pull-requests: write
     steps:
+      - uses: actions/checkout@v7
+
       - id: pr
-        uses: hubverse-org/hubverse-actions/resolve-pr@main
+        uses: ./resolve-pr
 
       - name: Remove the test comment
         if: steps.pr.outputs.number != ''

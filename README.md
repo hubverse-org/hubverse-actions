@@ -27,7 +27,7 @@ A workflow can be downloaded using `hubCI::use_hub_github_action()` and the name
 
 ## Composite actions
 
-A composite action is called with `uses: hubverse-org/hubverse-actions/<directory>@main`. The workflows above call these actions, and a hub writing its own workflow can call them directly.
+A composite action is called with `uses: hubverse-org/hubverse-actions/<directory>@v2`. The workflows above call these actions, and a hub writing its own workflow can call them directly.
 
 | Action | What it does |
 |---|---|

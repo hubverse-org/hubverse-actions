@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: hubverse-org/hubverse-actions/validate-target-data@main
+      - uses: hubverse-org/hubverse-actions/validate-target-data@v2
         # Set `hub_path` when the hub is not at the repository root, and change
         # the `paths:` filter above to match. Commenting is on by default; see
         # the action README for the full list of settings.

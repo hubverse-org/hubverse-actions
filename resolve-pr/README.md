@@ -6,10 +6,10 @@ flow](../validate-submission/README.md#how-it-works).
 
 ```yaml
 - id: pr
-  uses: hubverse-org/hubverse-actions/resolve-pr@main
+  uses: hubverse-org/hubverse-actions/resolve-pr@v2
 
 - if: steps.pr.outputs.number != ''
-  uses: hubverse-org/hubverse-actions/pr-comment@main
+  uses: hubverse-org/hubverse-actions/pr-comment@v2
   with:
     pr: ${{ steps.pr.outputs.number }}
     header: my-workflow
