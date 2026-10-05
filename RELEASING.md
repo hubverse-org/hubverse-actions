@@ -14,14 +14,14 @@ referencing `@v2` therefore runs the latest `v2.x.y` release on its next
 workflow run, without changing its workflows. This is the convention GitHub
 Actions use, as in `actions/checkout@v4`.
 
-Each release has two tags:
+Each release has two tags, for example `v2.1.3` and `v2`:
 
-- `v2.1.3` is created by the release and never moved. It carries the GitHub
-  release.
-- `v2` is moved by `ci-release.yaml` when the release is published. It never
-  gets a GitHub release of its own, because GitHub refuses to move a tag that
-  has a release once immutable releases are enabled. `ci-release.yaml` refuses
-  to move it backwards.
+- The version tag, `v2.1.3`, is created by the release and never moved. It
+  carries the GitHub release.
+- The major tag, `v2`, is moved by `ci-release.yaml` when the release is
+  published. It never gets a GitHub release of its own, because GitHub
+  refuses to move a tag that has a release once immutable releases are
+  enabled. `ci-release.yaml` refuses to move it backwards.
 
 A new major is a new tag, `v3`. Hubs stay on `v2` until they change the
 reference, and Dependabot opens the pull request for that (see
