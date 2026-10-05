@@ -42,6 +42,9 @@ A composite action is called with `uses: hubverse-org/hubverse-actions/<director
 
 The [`dependabot`](dependabot) directory holds a Dependabot configuration a hub installs to keep the actions its workflows use up to date. It is installed with `hubCI::use_hub_dependabot()`, available from hubCI 0.1.0.
 
+## Releases
+
+[`RELEASING.md`](RELEASING.md) describes how versions are chosen and how a release is cut.
 
 ## Additional resources
 

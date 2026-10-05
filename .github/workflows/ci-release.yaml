@@ -1,0 +1,45 @@
+name: Move the floating major tag
+
+# Moves the floating major tag (`v2`) onto each published release, so hubs
+# referencing the actions at `@v2` pick the release up on their next run.
+# RELEASING.md describes the process this is part of.
+
+on:
+  release:
+    types: [released]
+
+permissions:
+  contents: write
+
+jobs:
+  move-major-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          # The ancestry check needs the history and the tag check needs every
+          # tag. A full fetch brings both.
+          fetch-depth: 0
+
+      - name: Move the major tag onto the released commit
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::refusing to move a major tag for \"$TAG\", which is not of the form vMAJOR.MINOR.PATCH."
+            exit 1
+          fi
+          major="${TAG%%.*}"
+          # A release targeted at an old commit by mistake would otherwise move
+          # the tag backwards and downgrade every hub on it. The tag may not
+          # exist yet.
+          if git rev-parse --quiet --verify "refs/tags/$major" >/dev/null &&
+             ! git merge-base --is-ancestor "$major" HEAD; then
+            echo "::error::refusing to move $major from $(git rev-parse --short "$major") to $TAG, which does not descend from it."
+            exit 1
+          fi
+          # The full refspec rules out a branch of the same name.
+          git push --force origin "HEAD:refs/tags/$major"
+          echo "Moved \`$major\` to \`$TAG\` ($(git rev-parse --short HEAD))." >> "$GITHUB_STEP_SUMMARY"

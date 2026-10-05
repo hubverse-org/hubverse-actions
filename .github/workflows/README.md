@@ -16,18 +16,11 @@ tag along with the actions.
 
 ## This repository's own CI
 
-Everything prefixed `test-`. These run against pull requests here and are not
-consumed by anyone.
+Everything prefixed `test-` or `ci-`. These are not consumed by anyone.
+`test-` workflows test the actions and scripts in this repository against
+pull requests here. `ci-` workflows are the repository's other automation,
+such as `ci-release.yaml`, which moves the floating major tag on each release.
+Each file's header comment says what it does.
 
-| | |
-|---|---|
-| `test-pr-comment.yaml` | Self-tests [`pr-comment`](../../pr-comment) against the pull request it runs on. |
-| `test-validate-submission.yaml` | Runs [`validate-submission`](../../validate-submission) against fixture PRs in `ci-testhub-simple`, and its summary rendering against bundled test hubs. |
-| `test-submission-comment.yaml` | Stage 1 of the handoff self-test: uploads a stub result. |
-| `test-submission-comment-post.yaml` | Stage 2: listens for the above finishing and calls the same shared workflow a hub calls. Split in two because a workflow cannot listen to itself. |
-| `test-validate-target-data.yaml` | Runs [`validate-target-data`](../../validate-target-data) against fixture PRs in `ci-testhub-target`, and its summary rendering against a bundled test hub. |
-| `test-s3-bucket-upload.yaml` | Runs the shell behind [`s3-bucket-upload`](../../s3-bucket-upload) against fixture hubs, and the action itself against the paths that stop before reaching AWS. |
-| `test-validate-config.yaml` | Runs [`validate-config`](../../validate-config) against `ci-testhub-simple`, unmodified and with its config broken, and its summary rendering against a bundled test hub. |
-
-If you add a reusable workflow here, add it to the first table. If you add CI,
-prefix it `test-` so the distinction keeps holding.
+If you add a reusable workflow here, add it to the table above. If you add CI,
+prefix it `test-` or `ci-` and leave this file alone.
