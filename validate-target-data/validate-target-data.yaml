@@ -9,7 +9,6 @@ name: Hub Target Data Validation (R)
 # reach you without you having to add a new copy of this file.
 
 on:
-  workflow_dispatch:
   pull_request:
     branches: main
     paths:

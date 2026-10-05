@@ -4,7 +4,7 @@ name: Test pr-comment action
 # checks sticky behaviour (create then update-in-place, same comment id); another
 # checks the revision behaviour (same revision edits in place, a new revision
 # reposts a fresh comment); a third checks that invalid inputs are rejected.
-# Each cleans up the comment it creates.
+# A final job removes the comments they create.
 
 on:
   pull_request:
@@ -15,6 +15,11 @@ on:
 permissions:
   contents: read
   pull-requests: write
+
+# The headers carry the run ID so that two runs on the same pull request never
+# share a comment.
+env:
+  HEADER_PREFIX: ci-selftest-${{ github.run_id }}
 
 jobs:
   sticky:
@@ -30,7 +35,7 @@ jobs:
         uses: ./pr-comment
         with:
           pr: ${{ github.event.number }}
-          header: ci-selftest
+          header: ${{ env.HEADER_PREFIX }}-sticky
           body: "pr-comment self-test: created."
 
       - name: Write an updated body to a file
@@ -43,10 +48,10 @@ jobs:
         uses: ./pr-comment
         with:
           pr: ${{ github.event.number }}
-          header: ci-selftest
+          header: ${{ env.HEADER_PREFIX }}-sticky
           body_path: ${{ runner.temp }}/comment.md
 
-      - name: Assert one comment, updated in place, then clean up
+      - name: Assert one comment, updated in place
         uses: actions/github-script@v9
         env:
           ID_CREATE: ${{ steps.create.outputs.comment-id }}
@@ -57,7 +62,7 @@ jobs:
               core.setFailed(`sticky update should keep the same comment id: ${process.env.ID_CREATE} -> ${process.env.ID_UPDATE}`);
               return;
             }
-            const marker = '<!-- hubverse-comment:ci-selftest -->';
+            const marker = `<!-- hubverse-comment:${process.env.HEADER_PREFIX}-sticky -->`;
             const comments = await github.paginate(github.rest.issues.listComments, {
               ...context.repo,
               issue_number: context.issue.number,
@@ -76,8 +81,7 @@ jobs:
               core.setFailed('a comment posted without a revision should carry no revision footer');
               return;
             }
-            await github.rest.issues.deleteComment({ ...context.repo, comment_id: mine[0].id });
-            core.info('sticky self-test passed; test comment removed.');
+            core.info('sticky self-test passed.');
 
   revision:
     if: github.event.pull_request.head.repo.full_name == github.repository
@@ -90,7 +94,7 @@ jobs:
         uses: ./pr-comment
         with:
           pr: ${{ github.event.number }}
-          header: ci-selftest-revision
+          header: ${{ env.HEADER_PREFIX }}-revision
           revision: rev-a
           body: "revision self-test: A."
 
@@ -99,7 +103,7 @@ jobs:
         uses: ./pr-comment
         with:
           pr: ${{ github.event.number }}
-          header: ci-selftest-revision
+          header: ${{ env.HEADER_PREFIX }}-revision
           revision: rev-a
           body: "revision self-test: A updated."
 
@@ -108,7 +112,7 @@ jobs:
         uses: ./pr-comment
         with:
           pr: ${{ github.event.number }}
-          header: ci-selftest-revision
+          header: ${{ env.HEADER_PREFIX }}-revision
           revision: rev-b
           body: "revision self-test: B."
 
@@ -118,7 +122,7 @@ jobs:
         uses: ./pr-comment
         with:
           pr: ${{ github.event.number }}
-          header: ci-selftest-revision
+          header: ${{ env.HEADER_PREFIX }}-revision
           revision: 0123456789abcdef0123456789abcdef01234567
           body: "revision self-test: C."
 
@@ -139,7 +143,7 @@ jobs:
               core.setFailed('a new revision should post a new comment, but the id was unchanged');
               return;
             }
-            const prefix = '<!-- hubverse-comment:ci-selftest-revision:';
+            const prefix = `<!-- hubverse-comment:${process.env.HEADER_PREFIX}-revision:`;
             const comments = await github.paginate(github.rest.issues.listComments, {
               ...context.repo,
               issue_number: context.issue.number,
@@ -172,10 +176,30 @@ jobs:
               core.setFailed('a SHA revision should be abbreviated in the footer');
               return;
             }
-            for (const comment of mine) {
+            core.info('revision self-test passed.');
+
+  cleanup:
+    # Each run posts under its own headers, so no later run removes the
+    # comments this run leaves behind.
+    if: always() && github.event.pull_request.head.repo.full_name == github.repository
+    needs: [sticky, revision]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove the test comments
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const prefix = `<!-- hubverse-comment:${process.env.HEADER_PREFIX}-`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            for (const comment of comments.filter((c) => c.body && c.body.includes(prefix))) {
+              // The log is the only record of a comment once it is deleted.
+              core.info(`Removing comment ${comment.id}:\n${comment.body}`);
               await github.rest.issues.deleteComment({ ...context.repo, comment_id: comment.id });
             }
-            core.info('revision self-test passed; test comments removed.');
 
   invalid-inputs:
     # The input guards run before any API call, so no comment is posted and this
