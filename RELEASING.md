@@ -61,9 +61,12 @@ with these differences:
    git push origin v2.1.3
    ```
 4. Create the release as a draft, review and edit the generated notes, then
-   publish it:
+   publish it. The notes start from the previous release, named explicitly:
+   without `--notes-start-tag`, GitHub takes the floating major tag as the
+   previous release and lists only the changes since the tag last moved.
    ```sh
-   gh release create v2.1.3 --title v2.1.3 --generate-notes --draft
+   gh release create v2.1.3 --title v2.1.3 --generate-notes \
+     --notes-start-tag v2.1.2 --draft
    ```
 5. Check that the `ci-release.yaml` run for the release succeeded.
 6. For a major release, announce it on GitHub and the mailing list, with the
