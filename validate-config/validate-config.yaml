@@ -1,12 +1,9 @@
 name: Hub Config Validation (R)
 
-# Checks the hub's config files against the hubverse schema when a pull request
-# changes them, and posts the result on that pull request. Add it with:
+# Validates the hub's config files when a pull request changes them and posts
+# the result on that pull request. Added with:
 #
 #   hubCI::use_hub_github_action("validate-config")
-#
-# The steps live in hubverse-actions rather than here, so that fixes to them
-# reach you without you having to add a new copy of this file.
 
 on:
   workflow_dispatch:
@@ -21,17 +18,9 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Hubs put this job's name in their branch protection rules, so renaming it
-  # silently stops their required check from ever reporting.
   validate-hub-config:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - uses: hubverse-org/hubverse-actions/validate-config@v2
-        # Set `hub_path` when the hub is not at the repository root, e.g. a demo
-        # hub shipped inside a package, and change the `paths:` filter above to
-        # match. Commenting is on by default; see the action README for the full
-        # list of settings.
-        # with:
-        #   hub_path: inst/demo_hub
