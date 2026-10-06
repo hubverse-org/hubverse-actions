@@ -1,18 +1,14 @@
 name: Post Submission Validation Result
 
-# Companion to Hub Submission Validation (R). That workflow runs the checks and
-# saves the result, but a `pull_request` workflow triggered from a fork gets a
-# read-only GITHUB_TOKEN, so it cannot comment. This one runs once it finishes,
-# in the hub's own context, and posts what it saved.
+# Posts the result saved by Hub Submission Validation (R) on the pull request.
+# A workflow triggered by a pull request from a fork has a read-only token and
+# cannot comment, so posting happens here, after that workflow finishes, in the
+# hub's own context. Both workflows are added with:
 #
-# A workflow cannot listen to itself, which is why this is a second file rather
-# than another job in the first.
+#   hubCI::use_hub_github_action("validate-submission")
 #
-# `workflows:` below must match the validation workflow's `name:`. If you rename
-# that workflow, rename it here too, or results will quietly stop being posted.
-#
-# The steps live in hubverse-actions rather than here, so that fixes to them
-# reach you without you having to add a new copy of this file.
+# `workflows:` below must match the validation workflow's `name:`. Renaming one
+# without the other stops results being posted.
 
 on:
   workflow_run:
@@ -24,10 +20,6 @@ permissions:
 
 jobs:
   comment:
-    # Skipped on forks of the hub, matching the validation workflow. Stated here
-    # rather than relying on that workflow being skipped, because a run whose
-    # only job was skipped does not reliably report a conclusion this one treats
-    # as "nothing to do".
     if: github.event.repository.fork != true
     uses: hubverse-org/hubverse-actions/.github/workflows/post-validation-comment.yaml@v2
     permissions:

@@ -12,19 +12,15 @@ permissions:
 
 jobs:
   upload:
-    # Skip forks of the hub. A fork has no AWS role, and its copy of the data is
-    # not what the bucket serves.
+    # A fork has no AWS role.
     if: github.event.repository.fork != true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - uses: hubverse-org/hubverse-actions/s3-bucket-upload@v2
-        # The hub's admin config decides whether anything is uploaded and to
-        # which bucket. The account and region are those of hubverse-hosted
-        # storage, and a hub need not change them. The action's other inputs
-        # change which directories are synced, and can report what a sync would
-        # change without writing anything. See its README for the full list.
+        # Whether anything is uploaded, and to which bucket, comes from the hub's
+        # admin config. The account and region are hubverse's and need no change.
         with:
           aws_account: "767397675902"
           aws_region: us-east-1

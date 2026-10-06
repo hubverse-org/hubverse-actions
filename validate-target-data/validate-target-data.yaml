@@ -1,12 +1,9 @@
 name: Hub Target Data Validation (R)
 
-# Checks the target data files a pull request adds or changes, and posts the
-# result on that pull request. Add it with:
+# Validates the target data files a pull request adds or changes and posts the
+# result on that pull request. Added with:
 #
 #   hubCI::use_hub_github_action("validate-target-data")
-#
-# The steps live in hubverse-actions rather than here, so that fixes to them
-# reach you without you having to add a new copy of this file.
 
 on:
   pull_request:
@@ -26,16 +23,9 @@ permissions:
   pull-requests: write
 
 jobs:
-  # Hubs put this job's name in their branch protection rules, so renaming it
-  # silently stops their required check from ever reporting.
   validate-target-data:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - uses: hubverse-org/hubverse-actions/validate-target-data@v2
-        # Set `hub_path` when the hub is not at the repository root, and change
-        # the `paths:` filter above to match. Commenting is on by default; see
-        # the action README for the full list of settings.
-        # with:
-        #   hub_path: inst/demo_hub
