@@ -40,6 +40,8 @@ Semantic versioning, applied to actions and workflows:
 - **Patch.** Bug fixes, dependency bumps, documentation, and changes to this
   repository's own CI.
 
+Note that a merged Dependabot bump does not reach hubs until it is released.
+
 ## Release checklist
 
 This follows the [hubverse release process](https://docs.hubverse.io/en/latest/developer/release-process.html),
