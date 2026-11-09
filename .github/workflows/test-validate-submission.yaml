@@ -118,3 +118,12 @@ jobs:
             echo "::error::PR $PR: summary does not carry $marker"
             exit 1
           fi
+
+      # The fixture hub sets US/Eastern, but the validation above skips the
+      # submission window check, so check directly that R recognises it.
+      - name: Assert legacy timezone names are available
+        shell: Rscript {0}
+        run: |
+          if (!"US/Eastern" %in% OlsonNames()) {
+            stop("US/Eastern is not a recognised timezone on this runner")
+          }
